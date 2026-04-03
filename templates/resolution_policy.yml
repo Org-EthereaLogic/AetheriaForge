@@ -1,0 +1,23 @@
+# AetheriaForge — Resolution Policy Template
+# Defines cross-source entity resolution rules.
+
+policy:
+  name: example_resolution
+  version: "1.0.0"
+
+sources:
+  - name: primary_system
+    key_columns: [entity_id]
+    priority: 1
+  - name: secondary_system
+    key_columns: [alt_id, alt_name]
+    priority: 2
+
+matching:
+  strategy: exact  # exact | fuzzy | composite
+  confidence_threshold: 0.85
+  ambiguity_behavior: skip  # skip | fail | best_match
+
+evidence:
+  record_all_decisions: true
+  include_rejected_matches: true

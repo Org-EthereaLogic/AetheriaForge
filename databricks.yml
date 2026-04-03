@@ -1,0 +1,22 @@
+# AetheriaForge Databricks Asset Bundle
+# See: https://docs.databricks.com/dev-tools/bundles/
+
+bundle:
+  name: aetheriaforge
+
+include:
+  - "resources/*.yml"
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog name
+  schema:
+    description: Unity Catalog schema name
+    default: default
+
+targets:
+  dev:
+    default: true
+    mode: development
+  prod:
+    mode: production

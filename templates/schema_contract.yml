@@ -1,0 +1,29 @@
+# AetheriaForge — Schema Contract Template
+# Defines the expected schema for a target Medallion layer.
+
+contract:
+  name: example_schema
+  version: "1.0.0"
+  layer: silver
+
+columns:
+  - name: id
+    type: long
+    nullable: false
+  - name: name
+    type: string
+    nullable: false
+  - name: amount
+    type: double
+    nullable: true
+  - name: event_date
+    type: date
+    nullable: false
+  - name: updated_at
+    type: timestamp
+    nullable: false
+
+enforcement:
+  unknown_columns: reject  # reject | ignore | quarantine
+  type_coercion: true
+  null_violation: quarantine

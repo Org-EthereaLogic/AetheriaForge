@@ -1,0 +1,45 @@
+# AetheriaForge — Forge Contract Template
+# Copy and customize for each registered dataset.
+
+dataset:
+  name: example_dataset
+  version: "1.0.0"
+
+source:
+  catalog: my_catalog
+  schema: bronze
+  table: raw_records
+
+target:
+  catalog: my_catalog
+  schema: silver
+  table: forged_records
+
+coherence:
+  engine: shannon
+  thresholds:
+    bronze_min: 0.5
+    silver_min: 0.75
+    gold_min: 0.95
+
+schema_contract:
+  enforce: true
+  evolution: versioned
+  coerce_types: true
+
+resolution:
+  enabled: false
+  # Uncomment and configure for cross-source entity resolution:
+  # sources:
+  #   - name: primary
+  #     key_columns: [entity_id]
+  #   - name: secondary
+  #     key_columns: [alt_entity_id]
+  # match_strategy: exact
+
+temporal:
+  enabled: false
+  # Uncomment and configure for temporal reconciliation:
+  # timestamp_column: event_ts
+  # merge_strategy: latest_wins
+  # conflict_behavior: record_and_warn
