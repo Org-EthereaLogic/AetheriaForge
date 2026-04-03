@@ -1,0 +1,11 @@
+resources:
+  jobs:
+    forge_job:
+      name: "aetheriaforge_forge"
+      tasks:
+        - task_key: run_forge_pipeline
+          notebook_task:
+            notebook_path: ../notebooks/02_run_forge_pipeline.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"

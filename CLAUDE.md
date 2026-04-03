@@ -29,6 +29,7 @@ When prior repository patterns conflict, use this precedence:
 | `make coverage` | Run tests with coverage reporting |
 | `make bundle-catalog-check CATALOG=<catalog> [PROFILE=<profile>]` | Prove the selected Unity Catalog catalog exists for the current Databricks auth context |
 | `make bundle-validate CATALOG=<catalog> [PROFILE=<profile>]` | Validate the Databricks Asset Bundle against an explicit catalog input |
+| `make app-deploy CATALOG=<catalog> [PROFILE=<profile>]` | Deploy the AetheriaForge Databricks App from bundle-uploaded source |
 
 ### Core Workflow Commands (21 total)
 
@@ -98,7 +99,7 @@ Every directory contains a `README.md` describing its contents.
 | `app/` | Databricks App UI (Gradio) — operator dashboard for forge review |
 | `assets/` | Project brand assets |
 | `notebooks/` | Databricks onboarding, execution, and review notebooks |
-| `resources/` | Databricks Asset Bundle pipeline and job definitions |
+| `resources/` | Databricks Asset Bundle pipeline, job, and app resource definitions |
 | `templates/` | Forge contract, resolution policy, and schema contract templates |
 | `scripts/` | Operational helper scripts |
 | `tests/` | Product test suite |

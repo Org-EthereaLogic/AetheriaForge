@@ -1,0 +1,13 @@
+resources:
+  apps:
+    aetheriaforge_app:
+      name: aetheriaforge
+      description: AetheriaForge operator dashboard for forge registry and evidence review
+      source_code_path: ..
+      config:
+        command:
+          - gradio
+          - app/app.py
+        env:
+          - name: EVIDENCE_DIR
+            value: /tmp/aetheriaforge_evidence
