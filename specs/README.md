@@ -10,6 +10,8 @@ Canonical ÆtheriaForge SDLC, architecture, planning, and verification documents
 | `AF-SRS-001_Software_Requirements_Specification.md` | Functional and non-functional requirements |
 | `AF-SDD-001_Architecture_Blueprint.md` | Repository architecture and file taxonomy |
 | `AF-IP-001_Implementation_Plan.md` | Phased delivery plan |
+| `AF-IP-004_Phase4_Multi_Dataset_Hardening.md` | Phase 4 implementation plan |
+| `AF-IP-005_Phase5_Databricks_App.md` | Phase 5 implementation plan |
 | `AF-TP-001_Test_Plan.md` | Validation strategy and exit criteria |
 | `AF-TM-001_Traceability_Matrix.md` | Requirement-to-design-to-verification mapping |
 | `AF-SCMP-001_Software_Configuration_Management_Plan.md` | Controlled items, baselines, and change rules |

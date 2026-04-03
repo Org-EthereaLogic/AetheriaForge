@@ -1,0 +1,9 @@
+command:
+  - gradio
+  - app.py
+
+env:
+  - name: CONTRACTS_DIR
+    value: /tmp/aetheriaforge_contracts
+  - name: EVIDENCE_DIR
+    value: /tmp/aetheriaforge_evidence

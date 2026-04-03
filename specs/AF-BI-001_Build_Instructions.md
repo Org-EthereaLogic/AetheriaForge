@@ -81,13 +81,38 @@ Expected result: the bundle deploys Databricks jobs and pipelines into the
 workspace and the forge job terminates successfully when the package and
 catalog inputs are valid.
 
-## 6. Manual Workspace Import
+## 6. App Deployment
+
+Deploy the Gradio operator dashboard as a Databricks App:
+
+```bash
+make app-deploy CATALOG=<existing_uc_catalog> PROFILE=<profile>
+```
+
+Or run the deploy script directly:
+
+```bash
+python scripts/deploy_databricks_app.py --catalog <existing_uc_catalog> --profile <profile>
+```
+
+Expected result: the app deploys, compute becomes ACTIVE, and the script
+prints the app URL. The dashboard provides read-only access to the forge
+registry, transformation evidence, and analytics charts.
+
+For local development:
+
+```bash
+uv sync --group app
+gradio app/app.py
+```
+
+## 7. Manual Workspace Import
 
 Upload the `notebooks/` directory to a Databricks workspace to run the package
 from the deployed bundle files when available, falling back to GitHub for
 standalone imports.
 
-## 7. Governance Guard Check
+## 8. Governance Guard Check
 
 ```bash
 uv run pytest tests/test_governance_guards.py -q
@@ -97,7 +122,7 @@ Expected result: executable and bundle surfaces contain no banned scaffold
 markers, `databricks.yml` includes `resources/*.yml`, and the bundle does not
 encode Databricks auth interpolation.
 
-## 8. Canonical Placeholder Scan
+## 9. Canonical Placeholder Scan
 
 ```bash
 PATTERN='TO''DO|FIX''ME|TB''D|PLACE''HOLDER'; rg -n "$PATTERN" specs .claude CLAUDE.md docs
