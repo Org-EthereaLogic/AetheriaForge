@@ -12,6 +12,7 @@ Canonical ÆtheriaForge SDLC, architecture, planning, and verification documents
 | `AF-IP-001_Implementation_Plan.md` | Phased delivery plan |
 | `AF-IP-004_Phase4_Multi_Dataset_Hardening.md` | Phase 4 implementation plan |
 | `AF-IP-005_Phase5_Databricks_App.md` | Phase 5 implementation plan |
+| `AF-IP-006_Phase6_DriftSentinel_Integration.md` | Phase 6 implementation plan |
 | `AF-TP-001_Test_Plan.md` | Validation strategy and exit criteria |
 | `AF-TM-001_Traceability_Matrix.md` | Requirement-to-design-to-verification mapping |
 | `AF-SCMP-001_Software_Configuration_Management_Plan.md` | Controlled items, baselines, and change rules |

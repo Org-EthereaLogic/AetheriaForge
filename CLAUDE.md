@@ -96,6 +96,7 @@ Every directory contains a `README.md` describing its contents.
 | `src/aetheriaforge/evidence/` | Append-only transformation artifact writing |
 | `src/aetheriaforge/orchestration/` | Workflow sequencing for the forge pipeline |
 | `src/aetheriaforge/config/` | Forge contract and policy configuration |
+| `src/aetheriaforge/integration/` | Optional DriftSentinel event and drift interface |
 | `app/` | Databricks App UI (Gradio) — operator dashboard for forge review |
 | `assets/` | Project brand assets |
 | `notebooks/` | Databricks onboarding, execution, and review notebooks |

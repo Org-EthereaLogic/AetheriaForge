@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from aetheriaforge.config.contract import ForgeContract
 from aetheriaforge.evidence.writer import EvidenceWriter
 from aetheriaforge.forge.engine import ForgeEngine, ForgeResult
+
+if TYPE_CHECKING:
+    from aetheriaforge.integration.events import EventChannel
 from aetheriaforge.resolution.policy import ResolutionPolicy
 from aetheriaforge.resolution.resolver import EntityResolver, ResolutionResult
 from aetheriaforge.schema.enforcer import (
@@ -90,9 +93,11 @@ class ForgePipeline:
         self,
         contract: ForgeContract,
         evidence_writer: EvidenceWriter | None = None,
+        event_channel: EventChannel | None = None,
     ) -> None:
         self.contract = contract
         self.evidence_writer = evidence_writer
+        self.event_channel = event_channel
 
     def run(
         self,
@@ -164,5 +169,11 @@ class ForgePipeline:
         if self.evidence_writer is not None:
             evidence_path = self.evidence_writer.write(result.as_dict())
             result.evidence_path = str(evidence_path)
+
+        if self.event_channel is not None:
+            from aetheriaforge.integration.events import TransformationEvent
+
+            event = TransformationEvent.from_pipeline_result(result, self.contract)
+            self.event_channel.emit(event)
 
         return result

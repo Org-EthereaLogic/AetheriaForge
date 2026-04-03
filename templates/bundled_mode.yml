@@ -1,0 +1,13 @@
+# AetheriaForge — Bundled Mode Configuration Template
+#
+# Enable this to integrate with DriftSentinel when both products are deployed
+# in the same Databricks workspace.
+#
+# When disabled (the default), AetheriaForge operates in standalone mode
+# with no DriftSentinel dependency.
+
+integration:
+  enabled: false
+  events_dir: /dbfs/etherealogic/events/aetheriaforge
+  drift_dir: /dbfs/etherealogic/events/driftsentinel
+  auto_ingest: false

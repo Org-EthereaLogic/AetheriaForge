@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from aetheriaforge.config.registry import DatasetRegistry
 from aetheriaforge.evidence.writer import EvidenceWriter
 from aetheriaforge.orchestration.pipeline import ForgePipeline, PipelineResult
+
+if TYPE_CHECKING:
+    from aetheriaforge.integration.events import EventChannel
 from aetheriaforge.resolution.policy import ResolutionPolicy
 from aetheriaforge.schema.enforcer import ColumnSpec
 from aetheriaforge.temporal.reconciler import TemporalConfig
@@ -61,9 +64,11 @@ class ForgeRunner:
         self,
         registry: DatasetRegistry,
         evidence_writer: EvidenceWriter | None = None,
+        event_channel: EventChannel | None = None,
     ) -> None:
         self.registry = registry
         self.evidence_writer = evidence_writer
+        self.event_channel = event_channel
 
     def run_one(self, name: str, dataset_input: DatasetInput) -> PipelineResult:
         """Run the forge pipeline for a single named dataset.
@@ -71,7 +76,11 @@ class ForgeRunner:
         Raises ``KeyError`` if *name* is not in the registry.
         """
         contract = self.registry.get(name)
-        pipeline = ForgePipeline(contract, evidence_writer=self.evidence_writer)
+        pipeline = ForgePipeline(
+            contract,
+            evidence_writer=self.evidence_writer,
+            event_channel=self.event_channel,
+        )
         return pipeline.run(
             source_df=dataset_input.source_df,
             forged_df=dataset_input.forged_df,
