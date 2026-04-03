@@ -13,13 +13,14 @@
 | Item | Value | Classification |
 | --- | --- | --- |
 | Branch | main | repo-verified |
-| Commit | 1bbeaa8 Initial commit | repo-verified |
-| Implementation phase | Phase 0: Scaffold (active — all scaffold files added, pending commit) | repo-verified |
+| Commit | 8575d64 chore(scaffold): add complete Phase 0 scaffold | repo-verified |
+| Implementation phase | Phase 0: Scaffold — complete, committed, pushed | repo-verified |
 | Lint | PASS (ruff check, all checks passed) | repo-verified |
 | Typecheck | PASS (mypy, 10 source files, no issues) | repo-verified |
 | Tests | 0 collected — scaffold state, no test implementations yet | repo-verified |
 | git diff --check | PASS (no whitespace errors) | repo-verified |
-| Databricks bundle check | SKIPPED — no Databricks CLI auth configured in session | repo-verified |
+| Bundle catalog check | PASS — catalog `adb_dev` confirmed, profile `e62-trial` | repo-verified |
+| Bundle validate | PASS — `Validation OK!` target dev, workspace path confirmed | repo-verified |
 
 ## Documentation Audit
 
@@ -36,8 +37,8 @@
 | Field | Observed Value | Classification |
 | --- | --- | --- |
 | Page title | ⚒️ AetheriaForge — UMIF Data Quality + Drift Foundry | public-page-observed |
-| Status | Backlog | public-page-observed |
-| About this project | (empty) | public-page-observed |
+| Status | In Progress (updated this session) | public-page-observed |
+| About this project | Populated this session with Phase 0 status | public-page-observed |
 | Project tasks | inline database, no tasks | public-page-observed |
 
 ## Notion Sync Outcome
@@ -46,12 +47,23 @@
 - "About this project" section updated with Phase 0 scaffold status, validation results, and next phase
 - Status property: updated from Backlog to In Progress
 
+## Databricks Auth
+
+| Item | Value |
+| --- | --- |
+| Profile | e62-trial |
+| Host | https://dbc-9cfc36a7-5883.cloud.databricks.com |
+| User | anthony.johnsonii@etherealogic.ai |
+| Auth type | databricks-cli |
+| Catalog | adb_dev (MANAGED_CATALOG) |
+| Bundle target | dev |
+| Bundle workspace path | /Workspace/Users/anthony.johnsonii@etherealogic.ai/.bundle/aetheriaforge/dev |
+
 ## Open Risks and Blockers
 
 | Risk | Severity | Classification |
 | --- | --- | --- |
 | 0 tests collected — test suite is scaffold-only | Low (expected at Phase 0) | repo-verified |
-| Databricks bundle check not run — no CLI auth in session | Low (pre-implementation gate) | repo-verified |
 
 ## Next Actions (Phase 1)
 
