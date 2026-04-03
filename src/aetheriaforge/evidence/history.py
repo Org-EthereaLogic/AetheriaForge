@@ -1,0 +1,120 @@
+"""Transformation history — query interface over evidence artifacts."""
+
+from __future__ import annotations
+
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+class TransformationHistory:
+    """Read-only query interface over the evidence directory.
+
+    Parses ``forge-evidence-*.json`` files written by :class:`EvidenceWriter`
+    and supports filtering by dataset name, verdict, and time range.
+    """
+
+    def __init__(self, evidence_dir: Path) -> None:
+        self.evidence_dir = evidence_dir
+
+    # -- core read ------------------------------------------------------------
+
+    def _load_artifacts(self) -> list[dict[str, Any]]:
+        """Load and parse all evidence JSON files, skipping malformed ones."""
+        artifacts: list[dict[str, Any]] = []
+
+        if not self.evidence_dir.is_dir():
+            return artifacts
+
+        for path in sorted(self.evidence_dir.iterdir(), reverse=True):
+            if not path.suffix == ".json":
+                continue
+            try:
+                data = json.loads(path.read_text())
+                data["_evidence_path"] = str(path)
+                artifacts.append(data)
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Skipping malformed evidence file %s: %s", path, exc)
+
+        return artifacts
+
+    # -- queries --------------------------------------------------------------
+
+    def list_all(self) -> list[dict[str, Any]]:
+        """Return all evidence records sorted by file name descending."""
+        return self._load_artifacts()
+
+    def query(
+        self,
+        *,
+        dataset_name: str | None = None,
+        verdict: str | None = None,
+        after: datetime | None = None,
+        before: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Filter evidence records by optional criteria.
+
+        Parameters
+        ----------
+        dataset_name:
+            Match the ``dataset_name`` field in the artifact.
+        verdict:
+            Match ``pipeline_verdict`` or ``verdict`` fields.
+        after:
+            Include only artifacts with ``run_at`` or ``forged_at`` on or
+            after this datetime.
+        before:
+            Include only artifacts with ``run_at`` or ``forged_at`` on or
+            before this datetime.
+        """
+        results: list[dict[str, Any]] = []
+
+        for artifact in self._load_artifacts():
+            if dataset_name is not None:
+                if artifact.get("dataset_name") != dataset_name:
+                    continue
+
+            if verdict is not None:
+                art_verdict = artifact.get(
+                    "pipeline_verdict", artifact.get("verdict")
+                )
+                if art_verdict != verdict:
+                    continue
+
+            if after is not None or before is not None:
+                ts_str = artifact.get("run_at") or artifact.get("forged_at")
+                if ts_str is None:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(str(ts_str))
+                except ValueError:
+                    continue
+                if after is not None and ts < after:
+                    continue
+                if before is not None and ts > before:
+                    continue
+
+            results.append(artifact)
+
+        return results
+
+    # -- summary --------------------------------------------------------------
+
+    def summary(self) -> dict[str, dict[str, int]]:
+        """Return verdict counts grouped by dataset name.
+
+        Returns a dict of ``{dataset_name: {verdict: count}}``.
+        """
+        counts: dict[str, dict[str, int]] = {}
+
+        for artifact in self._load_artifacts():
+            ds = artifact.get("dataset_name", "_unknown")
+            v = artifact.get("pipeline_verdict", artifact.get("verdict", "_unknown"))
+            bucket = counts.setdefault(str(ds), {})
+            bucket[str(v)] = bucket.get(str(v), 0) + 1
+
+        return counts
