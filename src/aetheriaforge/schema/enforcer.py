@@ -85,7 +85,9 @@ class SchemaEnforcer:
                 rejection_reasons=rejection_reasons,
             )
 
-        working = df.copy()
+        # Defer copy until we actually need to mutate the DataFrame.
+        working = df
+        copied = False
 
         # --- Type coercion pass ------------------------------------------------
         if self.config.coerce_types:
@@ -95,6 +97,9 @@ class SchemaEnforcer:
                 current_dtype = str(working[spec.name].dtype)
                 if current_dtype != spec.dtype:
                     try:
+                        if not copied:
+                            working = df.copy()
+                            copied = True
                         target_dtype: Any = spec.dtype
                         working[spec.name] = working[spec.name].astype(target_dtype)
                         coercions_applied.append(

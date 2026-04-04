@@ -108,6 +108,23 @@ def record(
     print("".join(parts))
 
 
+def _forge_dataset(name: str, df: pd.DataFrame) -> pd.DataFrame:
+    """Create a realistic forged version of a dataset by applying filtering."""
+    if name.startswith("yellow_taxi"):
+        return df.dropna(subset=["passenger_count"]).reset_index(drop=True)
+    elif name == "us_counties_covid":
+        return df[df["cases"] > 0].reset_index(drop=True)
+    elif name.startswith("earthquakes"):
+        if "mag" in df.columns:
+            return df[df["mag"] >= 3.0].reset_index(drop=True)
+        return df.dropna().reset_index(drop=True)
+    elif name in ("air_quality", "epa_aqi_2024"):
+        return df.dropna(subset=[df.columns[0]]).reset_index(drop=True)
+    elif name == "github_events":
+        return df.dropna(subset=["org"]).reset_index(drop=True)
+    return df.copy()
+
+
 # -- Main test ---------------------------------------------------------------
 
 def main() -> None:
@@ -127,10 +144,14 @@ def main() -> None:
     dataframes: dict[str, pd.DataFrame] = {}
 
     ingest_targets = [
-        ("yellow_taxi", DATA_DIR / "yellow_tripdata_2024-01.parquet"),
+        ("yellow_taxi_jan", DATA_DIR / "yellow_tripdata_2024-01.parquet"),
+        ("yellow_taxi_jun", DATA_DIR / "yellow_tripdata_2024-06.parquet"),
+        ("yellow_taxi_oct", DATA_DIR / "yellow_tripdata_2024-10.parquet"),
         ("us_counties_covid", DATA_DIR / "us-counties.csv"),
         ("earthquakes", DATA_DIR / "earthquakes_all.csv"),
+        ("earthquakes_30day", DATA_DIR / "earthquakes_30day.csv"),
         ("air_quality", DATA_DIR / "air_quality.csv"),
+        ("epa_aqi_2024", DATA_DIR / "daily_aqi_by_county_2024.csv"),
         ("github_events", DATA_DIR / "github_events.json"),
     ]
 
@@ -157,19 +178,7 @@ def main() -> None:
     print("\n--- PHASE 2: Raw Shannon Entropy Scoring (benchmarks) ---")
 
     for name, df in dataframes.items():
-        # Create a forged version with realistic transformations
-        if name == "yellow_taxi":
-            forged = df.dropna(subset=["passenger_count"]).reset_index(drop=True)
-        elif name == "us_counties_covid":
-            forged = df[df["cases"] > 0].reset_index(drop=True)
-        elif name == "earthquakes":
-            forged = df[df["mag"] >= 3.0].reset_index(drop=True)
-        elif name == "air_quality":
-            forged = df.dropna(subset=[df.columns[0]]).reset_index(drop=True)
-        elif name == "github_events":
-            forged = df.dropna(subset=["org"]).reset_index(drop=True)
-        else:
-            forged = df.copy()
+        forged = _forge_dataset(name, df)
 
         with Timer(f"entropy_{name}") as t:
             score = shannon_coherence_score(df, forged)
@@ -191,19 +200,7 @@ def main() -> None:
             for col in df.columns
         ]
 
-        # Create a forged version
-        if name == "yellow_taxi":
-            forged = df.dropna(subset=["passenger_count"]).reset_index(drop=True)
-        elif name == "us_counties_covid":
-            forged = df[df["cases"] > 0].reset_index(drop=True)
-        elif name == "earthquakes":
-            forged = df[df["mag"] >= 3.0].reset_index(drop=True)
-        elif name == "air_quality":
-            forged = df.dropna(subset=[df.columns[0]]).reset_index(drop=True)
-        elif name == "github_events":
-            forged = df.dropna(subset=["org"]).reset_index(drop=True)
-        else:
-            forged = df.copy()
+        forged = _forge_dataset(name, df)
 
         pipeline = ForgePipeline(contract, evidence_writer=writer)
 
@@ -266,16 +263,15 @@ def main() -> None:
             )
 
     # ========================================================================
-    # PHASE 5: Temporal Reconciliation on COVID data
+    # PHASE 5: Temporal Reconciliation on COVID data and EPA AQI
     # ========================================================================
     print("\n--- PHASE 5: Temporal Reconciliation ---")
 
     if "us_counties_covid" in dataframes:
         covid_df = dataframes["us_counties_covid"].copy()
 
-        # Use a subset for temporal reconciliation (full 2.5M would be huge)
-        # Pick a specific state to get realistic data volume
         if "state" in covid_df.columns and "date" in covid_df.columns:
+            # Test 1: New York subset
             state_subset = covid_df[covid_df["state"] == "New York"].copy()
             state_subset["date"] = pd.to_datetime(state_subset["date"])
 
@@ -294,6 +290,56 @@ def main() -> None:
             record("temporal_reconcile", "covid_new_york",
                    len(state_subset), len(state_subset.columns), t.elapsed, t.mem_peak_mb,
                    extra=f"reconciled={temp_result.reconciled_count} conflicts={temp_result.conflict_count}")
+
+            # Test 2: California (larger subset)
+            ca_subset = covid_df[covid_df["state"] == "California"].copy()
+            ca_subset["date"] = pd.to_datetime(ca_subset["date"])
+
+            reconciler2 = TemporalReconciler(temporal_config, evidence_writer=writer)
+
+            with Timer("temporal_covid_ca") as t:
+                temp_result2 = reconciler2.reconcile(ca_subset)
+
+            record("temporal_reconcile", "covid_california",
+                   len(ca_subset), len(ca_subset.columns), t.elapsed, t.mem_peak_mb,
+                   extra=f"reconciled={temp_result2.reconciled_count} conflicts={temp_result2.conflict_count}")
+
+    if "epa_aqi_2024" in dataframes:
+        epa_df = dataframes["epa_aqi_2024"].copy()
+        date_col = None
+        for c in epa_df.columns:
+            if "date" in c.lower():
+                date_col = c
+                break
+        county_col = None
+        for c in epa_df.columns:
+            if "county" in c.lower():
+                county_col = c
+                break
+        state_col = None
+        for c in epa_df.columns:
+            if "state" in c.lower() and "code" not in c.lower():
+                state_col = c
+                break
+
+        if date_col and county_col and state_col:
+            epa_df[date_col] = pd.to_datetime(epa_df[date_col])
+
+            temporal_config_epa = TemporalConfig(
+                timestamp_column=date_col,
+                merge_strategy="latest_wins",
+                conflict_behavior="skip",
+                entity_key_columns=(county_col, state_col),
+            )
+
+            reconciler3 = TemporalReconciler(temporal_config_epa, evidence_writer=writer)
+
+            with Timer("temporal_epa_aqi") as t:
+                temp_result3 = reconciler3.reconcile(epa_df)
+
+            record("temporal_reconcile", "epa_aqi_2024",
+                   len(epa_df), len(epa_df.columns), t.elapsed, t.mem_peak_mb,
+                   extra=f"reconciled={temp_result3.reconciled_count} conflicts={temp_result3.conflict_count}")
 
     # ========================================================================
     # PHASE 6: Stress the evidence directory (write + read many artifacts)
