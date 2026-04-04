@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-PRD-001 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 
 ## 1. Purpose
 
@@ -43,6 +43,7 @@ preserves explicit failure behavior and evidence traceability throughout.
 - Databricks Asset Bundle deployment
 - onboarding, execution, and review notebooks
 - operator dashboard (Gradio Databricks App)
+- enterprise file ingestion (CSV, TSV, Parquet, JSON, JSONL, Excel, XML, ORC, Avro, fixed-width)
 - local verification surfaces
 
 ## 4. Out of Scope for Version 1
@@ -75,6 +76,7 @@ preserves explicit failure behavior and evidence traceability throughout.
 | AF-FR-015 | Scaffold Codacy, Codecov, and Snyk before product implementation |
 | AF-FR-016 | Define evidence-backed Notion dashboard sync policy |
 | AF-FR-017 | Provide an operator dashboard for transformation review and evidence inspection |
+| AF-FR-018 | Ingest enterprise file formats (CSV, TSV, Parquet, JSON, JSONL, Excel, XML, ORC, Avro, fixed-width) into DataFrames with evidence |
 
 ## 6. Non-Functional Requirements
 

@@ -44,6 +44,7 @@ aetheriaforge/
 
 ### Application Layer
 
+- `src/aetheriaforge/ingest/` — enterprise file ingestion (CSV, Parquet, JSON, Excel, XML, ORC, Avro, etc.)
 - `src/aetheriaforge/forge/` — coherence-scored transformation engine
 - `src/aetheriaforge/resolution/` — cross-source entity resolution
 - `src/aetheriaforge/temporal/` — temporal reconciliation and merge logic
@@ -70,6 +71,7 @@ aetheriaforge/
 
 | Module | Primary Job | Medallion Layer |
 | --- | --- | --- |
+| `ingest/` | Enterprise file format ingestion | Pre-Bronze (file → DataFrame) |
 | `forge/` | Coherence-scored transformations | Bronze → Silver |
 | `resolution/` | Cross-source entity reconciliation | Silver |
 | `temporal/` | Temporal record reconciliation | Silver |
@@ -81,15 +83,16 @@ aetheriaforge/
 ## 4. Control Flow
 
 1. Register dataset and forge contract
-2. Load source data from Bronze layer
-3. Run schema enforcement against the registered contract
-4. Execute coherence-scored transformation with Shannon entropy
-5. Run entity resolution across configured source mappings
-6. Run temporal reconciliation for time-inconsistent records
-7. Write forged Silver-ready output to target surface
-8. Write append-only transformation evidence
-9. Emit transformation event (if bundled mode is active)
-10. Review outcomes through notebooks and the operator dashboard
+2. Ingest source files (CSV, Parquet, JSON, Excel, XML, ORC, Avro, fixed-width)
+3. Load source data from Bronze layer
+4. Run schema enforcement against the registered contract
+5. Execute coherence-scored transformation with Shannon entropy
+6. Run entity resolution across configured source mappings
+7. Run temporal reconciliation for time-inconsistent records
+8. Write forged Silver-ready output to target surface
+9. Write append-only transformation evidence
+10. Emit transformation event (if bundled mode is active)
+11. Review outcomes through notebooks and the operator dashboard
 
 ## 5. Entropy Engine Architecture
 

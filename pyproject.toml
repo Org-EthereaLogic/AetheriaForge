@@ -31,6 +31,16 @@ dev = [
     "pillow>=10.0",
     "pandas-stubs>=2.0",
     "types-PyYAML>=6.0",
+    "openpyxl>=3.1",
+    "lxml>=5.0",
+    "fastavro>=1.9",
+    "pyarrow>=14.0",
+]
+ingest = [
+    "openpyxl>=3.1",
+    "lxml>=5.0",
+    "fastavro>=1.9",
+    "pyarrow>=14.0",
 ]
 databricks = [
     "databricks-sdk>=0.20",
@@ -66,4 +76,8 @@ exclude = ["notebooks", "app"]
 
 [[tool.mypy.overrides]]
 module = "scipy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyarrow.*", "openpyxl.*", "lxml.*", "fastavro.*"]
 ignore_missing_imports = true

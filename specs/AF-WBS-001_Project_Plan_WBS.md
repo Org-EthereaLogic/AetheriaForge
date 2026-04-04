@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-WBS-001 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 
 ## Product Scaffold WBS
 
@@ -36,6 +36,7 @@
 | 2.8 | Bundle and notebooks | databricks.yml, resources/, notebooks/ |
 | 2.9 | Test suite | tests/ |
 | 2.10 | Verification and evidence | report/ |
+| 2.11 | Enterprise file ingestion module | src/aetheriaforge/ingest/ |
 
 ## Integration WBS
 

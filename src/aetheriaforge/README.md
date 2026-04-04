@@ -6,6 +6,7 @@ First-party ÆtheriaForge product code.
 
 | Package | Purpose |
 | --- | --- |
+| `ingest/` | Enterprise file ingestion (CSV, Parquet, JSON, Excel, XML, ORC, Avro, fixed-width) |
 | `forge/` | Coherence-scored transformation engine (Shannon entropy v1.x) |
 | `resolution/` | Cross-source entity resolution |
 | `temporal/` | Temporal reconciliation and merge logic |

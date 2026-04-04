@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-TM-001 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 
 | PRD Requirement | SRS Requirement | Spec Surface | Verification Surface |
 | --- | --- | --- | --- |
@@ -27,6 +27,7 @@
 | AF-FR-015 | AF-SR-014 | PRD, SRS, SCMP | .codacy/, codecov.yaml, .snyk, secret-name docs |
 | AF-FR-016 | AF-SR-015 | PRD, SRS, SCMP | docs/notion_dashboard_sync.md, /sync command |
 | AF-FR-017 | AF-SR-009 | PRD, SRS | app/, operator dashboard tests |
+| AF-FR-018 | AF-SR-016 | PRD, SRS, SDD, TP | src/aetheriaforge/ingest/, file ingestion tests |
 | AF-NFR-001 | AF-SNFR-002, AF-SNFR-006 | PRD, SRS, TP | report/, transformation evidence |
 | AF-NFR-002 | AF-SNFR-001 | PRD, SRS | append-only evidence writer and replay tests |
 | AF-NFR-003 | AF-SNFR-003 | PRD, SRS | missing-field failure tests, blocked status checks |

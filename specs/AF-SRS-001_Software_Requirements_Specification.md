@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-SRS-001 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 
 ## 1. Functional Requirements
 
@@ -27,6 +27,7 @@
 | AF-SR-013 | AF-FR-014 | Drift payload ingestion interface that receives drift reports from DriftSentinel and routes them into a remediation workflow |
 | AF-SR-014 | AF-FR-015 | Pre-implementation Codacy, Codecov, and Snyk setup |
 | AF-SR-015 | AF-FR-016 | Evidence-backed Notion dashboard sync policy with payload fallback |
+| AF-SR-016 | AF-FR-018 | File ingestion module that reads CSV, TSV, Parquet, JSON, JSONL, Excel, XML, ORC, Avro, and fixed-width files into DataFrames with format detection, reader options, and optional evidence writing |
 
 ## 2. Non-Functional Requirements
 

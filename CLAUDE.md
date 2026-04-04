@@ -89,6 +89,7 @@ Every directory contains a `README.md` describing its contents.
 | `.claude/settings.json` | Claude Code plugin configuration |
 | `src/` | Top-level source directory (src-layout) |
 | `src/aetheriaforge/` | First-party product code |
+| `src/aetheriaforge/ingest/` | Enterprise file ingestion (CSV, Parquet, JSON, Excel, XML, ORC, Avro, etc.) |
 | `src/aetheriaforge/forge/` | Coherence-scored transformation engine |
 | `src/aetheriaforge/resolution/` | Cross-source entity resolution |
 | `src/aetheriaforge/temporal/` | Temporal reconciliation and merge logic |

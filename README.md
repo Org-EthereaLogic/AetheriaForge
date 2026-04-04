@@ -45,6 +45,7 @@ gaps that existing tools do not address:
 
 | Surface | Purpose |
 | ------- | ------- |
+| `src/aetheriaforge/ingest/` | Enterprise file ingestion — CSV, Parquet, JSON, Excel, XML, ORC, Avro, and more |
 | `src/aetheriaforge/forge/` | Coherence-scored transformation engine (Shannon entropy v1.x) |
 | `src/aetheriaforge/resolution/` | Cross-source entity resolution with configurable matching rules |
 | `src/aetheriaforge/temporal/` | Temporal reconciliation across CDC, SCD Type 2, and batch sources |

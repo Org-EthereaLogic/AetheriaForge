@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-TP-001 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 
 ## 1. Scaffold Verification
 
@@ -44,14 +44,24 @@
 - Evolution: schema changes produce new contract versions, not retroactive mutation
 - Rejection evidence: non-conformant records quarantined with explicit reasons
 
-## 6. Integration Verification
+## 6. File Ingestion Verification
+
+- Unit tests for format detection from file extensions
+- Reader tests for each supported format: CSV, TSV, Parquet, JSON, JSONL, Excel, XML, ORC, Avro, fixed-width
+- Format override: explicit format parameter bypasses extension detection
+- Reader options: delimiter, encoding, sheet name, and other format-specific options pass through
+- Error handling: missing files, malformed content, and unsupported extensions produce explicit error results
+- Evidence writing: ingestion artifacts record file path, format, record count, and column list
+- IngestResult API: `ok` property, `as_dict()` JSON-safe serialization
+
+## 7. Integration Verification
 
 - Event emission: transformation events reach the configured channel
 - Drift ingestion: DriftSentinel payloads route into remediation workflow
 - Standalone mode: integration disabled by default, no errors when DriftSentinel absent
 - Bundle resources and notebook orchestration tests
 
-## 7. Deployment Verification
+## 8. Deployment Verification
 
 - Databricks workspace validation for both deployment paths
 - Configuration tests for forge contract registration and policy loading
@@ -59,7 +69,7 @@
 - Operator dashboard regression coverage verifies logo-asset availability,
   analytics theme options, and brand asset manifest integrity
 
-## 8. Exit Criteria
+## 9. Exit Criteria
 
 No phase is complete until tests agree with canonical specs, measured outputs
 support claimed verdicts, and evidence is replayable.
