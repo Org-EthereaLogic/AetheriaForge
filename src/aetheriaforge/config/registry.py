@@ -111,11 +111,24 @@ class DatasetRegistry:
     def from_directory(cls, path: Path) -> DatasetRegistry:
         """Load all ``*.yml`` / ``*.yaml`` files from *path* into a new registry."""
         registry = cls()
+        malformed: list[tuple[str, str]] = []
         for yaml_path in sorted(path.iterdir()):
             if yaml_path.suffix in (".yml", ".yaml"):
                 try:
                     contract = ForgeContract.from_yaml(yaml_path)
                     registry.register(contract)
                 except Exception as exc:
-                    logger.warning("Skipping malformed contract file %s: %s", yaml_path, exc)
+                    malformed.append((yaml_path.name, str(exc)))
+        if malformed:
+            preview = ", ".join(
+                f"{name}: {detail}" for name, detail in malformed[:3]
+            )
+            if len(malformed) > 3:
+                preview = f"{preview}, ..."
+            logger.warning(
+                "Skipped %d malformed contract file(s) in %s. Examples: %s",
+                len(malformed),
+                path,
+                preview,
+            )
         return registry

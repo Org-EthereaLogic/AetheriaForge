@@ -165,3 +165,20 @@ def test_from_directory_skips_malformed_yaml(tmp_path: Path) -> None:
 
     assert len(reg) == 1
     assert reg.get("valid").dataset_version == "1.0.0"
+
+
+def test_from_directory_summarizes_malformed_warnings(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    (tmp_path / "valid.yml").write_text(yaml.dump(_contract_dict("valid", "1.0.0")))
+    (tmp_path / "broken_1.yml").write_text("dataset: [")
+    (tmp_path / "broken_2.yml").write_text("dataset: [")
+
+    with caplog.at_level("WARNING"):
+        reg = DatasetRegistry.from_directory(tmp_path)
+
+    assert len(reg) == 1
+    warnings = [record.message for record in caplog.records]
+    assert len(warnings) == 1
+    assert "Skipped 2 malformed contract file(s)" in warnings[0]
+    assert "broken_1.yml" in warnings[0]

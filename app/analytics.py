@@ -1,19 +1,15 @@
-"""Analytics chart builders for the AetheriaForge operator dashboard.
-
-All functions are pure: they accept data and return Plotly figure objects.
-No evidence files are read here — that is handled by the caller.
-"""
+"""Analytics chart builders for the AetheriaForge operator dashboard."""
 
 from __future__ import annotations
 
-import concurrent.futures
-import json
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import plotly.graph_objects as go
+
+from aetheriaforge.evidence.history import TransformationHistory
 
 # -- Color palettes ----------------------------------------------------------
 
@@ -52,30 +48,12 @@ def _get_palette(theme: str) -> dict[str, str]:
     return _PALETTES.get(theme, _PALETTES["Brand"])
 
 
-# -- Data loading ------------------------------------------------------------
-
-def _parse_analytics_artifact(fpath: Path) -> dict[str, Any] | None:
-    try:
-        return json.loads(fpath.read_text())
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
 def build_analytics_data(evidence_dir: str) -> list[dict[str, Any]]:
-    """Load all evidence JSON files and return parsed records."""
+    """Load all evidence records through the shared history reader."""
     path = Path(evidence_dir)
     if not path.is_dir():
         return []
-
-    paths = [p for p in sorted(path.iterdir(), reverse=True) if p.suffix == ".json"]
-    records: list[dict[str, Any]] = []
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        for result in executor.map(_parse_analytics_artifact, paths):
-            if result is not None:
-                records.append(result)
-
-    return records
+    return TransformationHistory(path).list_all()
 
 
 # -- Chart builders ----------------------------------------------------------

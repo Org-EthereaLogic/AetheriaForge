@@ -286,6 +286,7 @@ def _build_theme():  # type: ignore[no-untyped-def]
     }
     theme_args: dict[str, str] = {}
     for k, v in pairs.items():
+        theme_args[k] = v
         theme_args[f"{k}_dark"] = v
     return gr.themes.Base(
         primary_hue=violet_hue, neutral_hue=slate_hue,
@@ -381,6 +382,8 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_load_registry_with_status,
                     inputs=[reg_path],
                     outputs=[reg_table, reg_status],
+                    queue=False,
+                    show_progress="hidden",
                 )
 
             # ---- Tab 2: Transformation Status ----
@@ -445,6 +448,8 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_query_with_summary,
                     inputs=[ev_dir, ds_filter, verdict_filter, from_filter, to_filter],
                     outputs=[status_table, run_summary],
+                    queue=False,
+                    show_progress="hidden",
                 )
 
             # ---- Tab 3: Evidence Explorer ----
@@ -480,10 +485,14 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_load_with_meta,
                     inputs=[exp_dir, exp_file],
                     outputs=[exp_json, exp_meta],
+                    queue=False,
+                    show_progress="hidden",
                 )
 
                 ev_dir.change(
                     fn=lambda d: d, inputs=[ev_dir], outputs=[exp_dir],
+                    queue=False,
+                    show_progress="hidden",
                 )
 
                 def _on_status_select(
@@ -502,6 +511,8 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_on_status_select,
                     inputs=[ev_dir],
                     outputs=[exp_dir, exp_file, exp_json, exp_meta, tabs],
+                    queue=False,
+                    show_progress="hidden",
                 )
 
             # ---- Tab 4: Analytics ----
@@ -572,12 +583,16 @@ def build_app():  # type: ignore[no-untyped-def]
                 fn=_refresh_analytics,
                 inputs=[ana_dir, color_theme],
                 outputs=[verdict_plot, coherence_hist_plot, volume_plot, trend_plot, ana_status],
+                queue=False,
+                show_progress="hidden",
             )
 
         app.load(
             fn=_load_registry_with_status,
             inputs=[reg_path],
             outputs=[reg_table, reg_status],
+            queue=False,
+            show_progress="hidden",
         )
 
     return app
