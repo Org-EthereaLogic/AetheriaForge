@@ -138,6 +138,7 @@ def build_daily_volume(
         yaxis_title="Artifacts",
         **_LAYOUT_DEFAULTS,
     )
+    fig.update_xaxes(type="category")
     return fig
 
 
@@ -171,4 +172,5 @@ def build_coherence_trend(
         yaxis_title="Avg Coherence Score",
         **_LAYOUT_DEFAULTS,
     )
+    fig.update_xaxes(type="category")
     return fig

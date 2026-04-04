@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from _pytest.monkeypatch import MonkeyPatch
+
 from aetheriaforge.evidence.history import TransformationHistory
 
 
@@ -141,3 +143,51 @@ def test_malformed_file_skipped(tmp_path: Path) -> None:
     history = TransformationHistory(ev_dir)
     results = history.list_all()
     assert len(results) == 1
+
+
+def test_list_all_reuses_cache_across_instances(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    ev_dir = tmp_path / "evidence"
+    _write_evidence(ev_dir, suffix="000001")
+    _write_evidence(ev_dir, suffix="000002")
+    TransformationHistory._cache.clear()
+
+    parse_calls = 0
+    original_parse = TransformationHistory._parse_artifact
+
+    def counting_parse(self: TransformationHistory, path: Path):  # type: ignore[no-untyped-def]
+        nonlocal parse_calls
+        parse_calls += 1
+        return original_parse(self, path)
+
+    monkeypatch.setattr(TransformationHistory, "_parse_artifact", counting_parse)
+
+    TransformationHistory(ev_dir).list_all()
+    TransformationHistory(ev_dir).list_all()
+
+    assert parse_calls == 2
+
+
+def test_cache_invalidates_when_directory_changes(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    ev_dir = tmp_path / "evidence"
+    _write_evidence(ev_dir, suffix="000001")
+    TransformationHistory._cache.clear()
+
+    parse_calls = 0
+    original_parse = TransformationHistory._parse_artifact
+
+    def counting_parse(self: TransformationHistory, path: Path):  # type: ignore[no-untyped-def]
+        nonlocal parse_calls
+        parse_calls += 1
+        return original_parse(self, path)
+
+    monkeypatch.setattr(TransformationHistory, "_parse_artifact", counting_parse)
+
+    TransformationHistory(ev_dir).list_all()
+    _write_evidence(ev_dir, suffix="000002")
+    TransformationHistory(ev_dir).list_all()
+
+    assert parse_calls == 3

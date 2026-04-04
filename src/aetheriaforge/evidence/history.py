@@ -5,11 +5,21 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _ArtifactCacheEntry:
+    """Cached parsed artifacts for one evidence directory snapshot."""
+
+    signature: tuple[tuple[str, int, int], ...]
+    artifacts: tuple[dict[str, Any], ...]
 
 
 class TransformationHistory:
@@ -21,6 +31,27 @@ class TransformationHistory:
 
     def __init__(self, evidence_dir: Path) -> None:
         self.evidence_dir = evidence_dir
+
+    _cache: dict[str, _ArtifactCacheEntry] = {}
+    _cache_lock = Lock()
+
+    def _artifact_paths(self) -> list[Path]:
+        """Return candidate JSON artifact paths sorted newest-first by name."""
+        if not self.evidence_dir.is_dir():
+            return []
+        return [
+            path for path in sorted(self.evidence_dir.iterdir(), reverse=True)
+            if path.suffix == ".json"
+        ]
+
+    @staticmethod
+    def _directory_signature(paths: list[Path]) -> tuple[tuple[str, int, int], ...]:
+        """Build a cache signature from path name, mtime, and size."""
+        signature: list[tuple[str, int, int]] = []
+        for path in paths:
+            stat = path.stat()
+            signature.append((path.name, stat.st_mtime_ns, stat.st_size))
+        return tuple(signature)
 
     # -- core read ------------------------------------------------------------
 
@@ -36,13 +67,17 @@ class TransformationHistory:
 
     def _load_artifacts(self) -> list[dict[str, Any]]:
         """Load and parse all evidence JSON files, skipping malformed ones."""
-        if not self.evidence_dir.is_dir():
+        paths = self._artifact_paths()
+        if not paths:
             return []
 
-        paths = [
-            p for p in sorted(self.evidence_dir.iterdir(), reverse=True)
-            if p.suffix == ".json"
-        ]
+        cache_key = str(self.evidence_dir.resolve())
+        signature = self._directory_signature(paths)
+
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+            if cached is not None and cached.signature == signature:
+                return list(cached.artifacts)
 
         artifacts: list[dict[str, Any]] = []
 
@@ -50,6 +85,12 @@ class TransformationHistory:
             for result in executor.map(self._parse_artifact, paths):
                 if result is not None:
                     artifacts.append(result)
+
+        with self._cache_lock:
+            self._cache[cache_key] = _ArtifactCacheEntry(
+                signature=signature,
+                artifacts=tuple(artifacts),
+            )
 
         return artifacts
 

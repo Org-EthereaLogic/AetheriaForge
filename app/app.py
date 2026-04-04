@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 import warnings
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -75,12 +75,24 @@ def _fmt_timestamp(raw: str) -> str:
 
 def _build_summary_line(rows: list[list[str]]) -> str:
     """Build a Markdown summary with total count and verdict breakdown."""
+    return _build_summary_line_with_total(rows)
+
+
+def _build_summary_line_with_total(
+    rows: list[list[str]], total_records: int | None = None
+) -> str:
+    """Build a Markdown summary with total count and verdict breakdown."""
     if not rows or (len(rows) == 1 and "no artifacts" in rows[0][0].lower()):
         return ""
-    total = len(rows)
+
+    visible_rows = [
+        row for row in rows
+        if row and not row[0].startswith("(Truncated from ")
+    ]
+    total = total_records if total_records is not None else len(visible_rows)
     counts: dict[str, int] = {"PASS": 0, "FAIL": 0, "WARN": 0}
     other = 0
-    for row in rows:
+    for row in visible_rows:
         raw = (row[2].strip() if len(row) > 2 else "")
         v = raw.split()[-1].upper() if raw else ""
         if v in counts:
@@ -159,21 +171,53 @@ def query_evidence(
     date_to: str,
 ) -> list[list[str]]:
     """Query evidence and return rows for the summary table."""
+    rows, _ = _query_evidence_records(
+        evidence_dir=evidence_dir,
+        dataset_name=dataset_name,
+        verdict=verdict,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return rows
+
+
+def _parse_filter_datetime(raw: str, *, is_end: bool) -> datetime | None:
+    """Parse UI date filters as UTC-aware datetimes."""
+    text = raw.strip()
+    if not text:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+    is_date_only = "T" not in text and " " not in text
+    if is_date_only:
+        if is_end:
+            parsed = parsed + timedelta(days=1) - timedelta(microseconds=1)
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    elif parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+
+    return parsed
+
+
+def _query_evidence_records(
+    evidence_dir: str,
+    dataset_name: str,
+    verdict: str,
+    date_from: str,
+    date_to: str,
+) -> tuple[list[list[str]], int]:
+    """Query evidence and return rows plus the untruncated result count."""
     edir = evidence_dir.strip() or EVIDENCE_DIR
     history = TransformationHistory(Path(edir))
 
-    after = None
-    before = None
-    if date_from.strip():
-        try:
-            after = datetime.fromisoformat(date_from.strip())
-        except ValueError:
-            pass
-    if date_to.strip():
-        try:
-            before = datetime.fromisoformat(date_to.strip())
-        except ValueError:
-            pass
+    after = _parse_filter_datetime(date_from, is_end=False)
+    before = _parse_filter_datetime(date_to, is_end=True)
 
     try:
         results = history.query(
@@ -183,13 +227,14 @@ def query_evidence(
             before=before,
         )
     except Exception as exc:  # noqa: BLE001
-        return [[f"(error: {exc})", "", "", "", "", ""]]
+        return [[f"(error: {exc})", "", "", "", "", ""]], 0
 
     if not results:
-        return [["(no artifacts found)", "", "", "", "", ""]]
+        return [["(no artifacts found)", "", "", "", "", ""]], 0
 
     rows: list[list[str]] = []
-    truncated = len(results) > 1000
+    total_results = len(results)
+    truncated = total_results > 1000
     for artifact in results[:1000]:
         filename = Path(artifact.get("_evidence_path", "")).name
         ds_name = artifact.get("dataset_name", "")
@@ -212,9 +257,9 @@ def query_evidence(
         ])
 
     if truncated:
-        rows.append([f"(Truncated from {len(results)} to latest 1000 records)", "...", "...", "...", "...", "..."])
+        rows.append([f"(Truncated from {total_results} to latest 1000 records)", "...", "...", "...", "...", "..."])
 
-    return rows
+    return rows, total_results
 
 
 def load_artifact_detail(evidence_dir: str, filename: str) -> str:
@@ -439,7 +484,7 @@ def build_app():  # type: ignore[no-untyped-def]
                     ed: str, ds: str, v: str, df: str, dt: str, progress: gr.Progress = gr.Progress()
                 ) -> tuple[list[list[str]], str]:
                     progress(0, desc="Querying recent pipeline evidence...")
-                    rows = query_evidence(ed, ds, v, df, dt)
+                    rows, total_results = _query_evidence_records(ed, ds, v, df, dt)
                     is_empty = len(rows) == 1 and "no artifacts" in rows[0][0].lower()
                     is_error = len(rows) == 1 and rows[0][0].startswith("(error")
                     if is_error:
@@ -450,7 +495,7 @@ def build_app():  # type: ignore[no-untyped-def]
                             "Confirm the evidence directory path is correct."
                         )
                     else:
-                        summary = _build_summary_line(rows)
+                        summary = _build_summary_line_with_total(rows, total_results)
                     return rows, summary
 
                 query_btn.click(

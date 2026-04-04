@@ -17,6 +17,7 @@ from app.analytics import (
 )
 from app.app import (
     _build_summary_line,
+    _build_summary_line_with_total,
     _fmt_timestamp,
     _get_logo_uris,
     load_artifact_detail,
@@ -98,6 +99,16 @@ class TestBuildSummaryLine:
         assert "PASS: 1" in result
         assert "FAIL: 1" in result
 
+    def test_truncation_row_does_not_count_as_other(self) -> None:
+        rows = [
+            ["f1.json", "ds_a", "\U0001f7e2 PASS", "0.85", "100 \u2192 95", "Apr 03"],
+            ["f2.json", "ds_b", "\U0001f534 FAIL", "0.50", "100 \u2192 90", "Apr 03"],
+            ["(Truncated from 1008 to latest 1000 records)", "...", "...", "...", "...", "..."],
+        ]
+        result = _build_summary_line_with_total(rows, total_records=1008)
+        assert "1008 artifacts" in result
+        assert "other:" not in result
+
 
 # -- load_registry_table -----------------------------------------------------
 
@@ -158,6 +169,12 @@ class TestQueryEvidence:
         rows = query_evidence(str(tmp_path), "", "FAIL", "", "")
         assert len(rows) == 1
         assert "FAIL" in rows[0][2]
+
+    def test_date_only_filters_are_timezone_safe(self, tmp_path: Path) -> None:
+        _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
+        rows = query_evidence(str(tmp_path), "", "", "2026-04-03", "2026-04-03")
+        assert len(rows) == 1
+        assert rows[0][1] == "orders"
 
 
 # -- load_artifact_detail ----------------------------------------------------
@@ -271,12 +288,14 @@ class TestDailyVolume:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
         fig = build_daily_volume(sample_records)
         assert fig is not None
+        assert fig.layout.xaxis.type == "category"
 
 
 class TestCoherenceTrend:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
         fig = build_coherence_trend(sample_records)
         assert fig is not None
+        assert fig.layout.xaxis.type == "category"
 
     def test_empty_records(self) -> None:
         fig = build_coherence_trend([])
