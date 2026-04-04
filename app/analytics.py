@@ -19,24 +19,24 @@ import plotly.graph_objects as go
 
 _PALETTES: dict[str, dict[str, str]] = {
     "Brand": {
-        "PASS": "#10B981", "WARN": "#F59E0B", "FAIL": "#F43F5E",
-        "bar": "#8B5CF6", "line": "#6366F1",
+        "PASS": "#22C7A0", "WARN": "#F59E0B", "FAIL": "#F97316",
+        "bar": "#8B5CF6", "line": "#20CFE0",
     },
     "Traffic Light": {
         "PASS": "#22C55E", "WARN": "#EAB308", "FAIL": "#EF4444",
-        "bar": "#3B82F6", "line": "#2563EB",
+        "bar": "#3B82F6", "line": "#3B82F6",
     },
     "Colorblind Safe": {
-        "PASS": "#0077BB", "WARN": "#EE7733", "FAIL": "#CC3311",
-        "bar": "#009988", "line": "#33BBEE",
+        "PASS": "#009E73", "WARN": "#F0E442", "FAIL": "#D55E00",
+        "bar": "#56B4E9", "line": "#56B4E9",
     },
     "Cyberpunk": {
         "PASS": "#00FF00", "WARN": "#FFE600", "FAIL": "#FF003C",
-        "bar": "#00E5FF", "line": "#9D00FF",
+        "bar": "#00E5FF", "line": "#00E5FF",
     },
     "Pastel": {
         "PASS": "#86EFAC", "WARN": "#FDE047", "FAIL": "#FCA5A5",
-        "bar": "#C4B5FD", "line": "#93C5FD",
+        "bar": "#93C5FD", "line": "#93C5FD",
     },
 }
 
@@ -114,12 +114,18 @@ def build_coherence_histogram(
             scores.append(float(score))
 
     fig = go.Figure(
-        data=[go.Histogram(x=scores, nbinsx=20, marker_color=palette["bar"])],
+        data=[go.Histogram(
+            x=scores, nbinsx=20,
+            marker_color=palette["bar"],
+            marker_line_color="rgba(0,0,0,0.3)",
+            marker_line_width=1,
+        )],
     )
     fig.update_layout(
         title="Coherence Score Distribution",
         xaxis_title="Coherence Score",
         yaxis_title="Count",
+        bargap=0.15,
         **_LAYOUT_DEFAULTS,
     )
     return fig
