@@ -45,6 +45,9 @@ logs/
 # Test output artifacts (screenshots, visual stress)
 output/
 
+# Local data files (large datasets for stress testing)
+data/
+
 # Implementation session tracking (contains local paths)
 progress.json
 progress.txt
