@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "aetheriaforge"
+name = "etherealogic-aetheriaforge"
 version = "0.1.0"
 description = "EthereaLogic Databricks Suite — Intelligent Data Transformation Engine"
 readme = "README.md"

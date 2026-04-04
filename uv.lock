@@ -14,81 +14,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "aetheriaforge"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "pandas" },
-    { name = "pyyaml" },
-    { name = "scipy" },
-]
-
-[package.dev-dependencies]
-app = [
-    { name = "gradio" },
-    { name = "plotly" },
-]
-databricks = [
-    { name = "databricks-sdk" },
-]
-dev = [
-    { name = "fastavro" },
-    { name = "lxml" },
-    { name = "mypy" },
-    { name = "openpyxl" },
-    { name = "pandas-stubs" },
-    { name = "pillow" },
-    { name = "pyarrow" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-docs = [
-    { name = "matplotlib" },
-]
-ingest = [
-    { name = "fastavro" },
-    { name = "lxml" },
-    { name = "openpyxl" },
-    { name = "pyarrow" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pandas", specifier = ">=2.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "scipy", specifier = ">=1.11" },
-]
-
-[package.metadata.requires-dev]
-app = [
-    { name = "gradio", specifier = ">=6.10.0,<7" },
-    { name = "plotly", specifier = ">=5.0,<6" },
-]
-databricks = [{ name = "databricks-sdk", specifier = ">=0.20" }]
-dev = [
-    { name = "fastavro", specifier = ">=1.9" },
-    { name = "lxml", specifier = ">=5.0" },
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "openpyxl", specifier = ">=3.1" },
-    { name = "pandas-stubs", specifier = ">=2.0" },
-    { name = "pillow", specifier = ">=10.0" },
-    { name = "pyarrow", specifier = ">=14.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-cov", specifier = ">=5.0" },
-    { name = "ruff", specifier = ">=0.4" },
-    { name = "types-pyyaml", specifier = ">=6.0" },
-]
-docs = [{ name = "matplotlib", specifier = ">=3.8" }]
-ingest = [
-    { name = "fastavro", specifier = ">=1.9" },
-    { name = "lxml", specifier = ">=5.0" },
-    { name = "openpyxl", specifier = ">=3.1" },
-    { name = "pyarrow", specifier = ">=14.0" },
-]
-
-[[package]]
 name = "aiofiles"
 version = "24.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -696,6 +621,81 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d3/38/af70d7ab1ae9d4da450eeec1fa3918940a5fafb9055e934af8d6eb0c2313/et_xmlfile-2.0.0.tar.gz", hash = "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54", size = 17234, upload-time = "2024-10-25T17:25:40.039Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa", size = 18059, upload-time = "2024-10-25T17:25:39.051Z" },
+]
+
+[[package]]
+name = "etherealogic-aetheriaforge"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pandas" },
+    { name = "pyyaml" },
+    { name = "scipy" },
+]
+
+[package.dev-dependencies]
+app = [
+    { name = "gradio" },
+    { name = "plotly" },
+]
+databricks = [
+    { name = "databricks-sdk" },
+]
+dev = [
+    { name = "fastavro" },
+    { name = "lxml" },
+    { name = "mypy" },
+    { name = "openpyxl" },
+    { name = "pandas-stubs" },
+    { name = "pillow" },
+    { name = "pyarrow" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+docs = [
+    { name = "matplotlib" },
+]
+ingest = [
+    { name = "fastavro" },
+    { name = "lxml" },
+    { name = "openpyxl" },
+    { name = "pyarrow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pandas", specifier = ">=2.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "scipy", specifier = ">=1.11" },
+]
+
+[package.metadata.requires-dev]
+app = [
+    { name = "gradio", specifier = ">=6.10.0,<7" },
+    { name = "plotly", specifier = ">=5.0,<6" },
+]
+databricks = [{ name = "databricks-sdk", specifier = ">=0.20" }]
+dev = [
+    { name = "fastavro", specifier = ">=1.9" },
+    { name = "lxml", specifier = ">=5.0" },
+    { name = "mypy", specifier = ">=1.10" },
+    { name = "openpyxl", specifier = ">=3.1" },
+    { name = "pandas-stubs", specifier = ">=2.0" },
+    { name = "pillow", specifier = ">=10.0" },
+    { name = "pyarrow", specifier = ">=14.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "ruff", specifier = ">=0.4" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
+]
+docs = [{ name = "matplotlib", specifier = ">=3.8" }]
+ingest = [
+    { name = "fastavro", specifier = ">=1.9" },
+    { name = "lxml", specifier = ">=5.0" },
+    { name = "openpyxl", specifier = ">=3.1" },
+    { name = "pyarrow", specifier = ">=14.0" },
 ]
 
 [[package]]
