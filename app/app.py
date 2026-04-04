@@ -79,7 +79,9 @@ def _build_summary_line(rows: list[list[str]]) -> str:
 
 
 def _build_summary_line_with_total(
-    rows: list[list[str]], total_records: int | None = None
+    rows: list[list[str]],
+    total_records: int | None = None,
+    verdict_counts: dict[str, int] | None = None,
 ) -> str:
     """Build a Markdown summary with total count and verdict breakdown."""
     if not rows or (len(rows) == 1 and "no artifacts" in rows[0][0].lower()):
@@ -90,23 +92,29 @@ def _build_summary_line_with_total(
         if row and not row[0].startswith("(Truncated from ")
     ]
     total = total_records if total_records is not None else len(visible_rows)
-    counts: dict[str, int] = {"PASS": 0, "FAIL": 0, "WARN": 0}
-    other = 0
-    for row in visible_rows:
-        raw = (row[2].strip() if len(row) > 2 else "")
-        v = raw.split()[-1].upper() if raw else ""
-        if v in counts:
-            counts[v] += 1
-        else:
-            other += 1
+
+    if verdict_counts is not None:
+        counts = verdict_counts
+        other = total - sum(counts.values())
+    else:
+        counts = {"PASS": 0, "FAIL": 0, "WARN": 0}
+        other = 0
+        for row in visible_rows:
+            raw = (row[2].strip() if len(row) > 2 else "")
+            v = raw.split()[-1].upper() if raw else ""
+            if v in counts:
+                counts[v] += 1
+            else:
+                other += 1
+
     parts = [f"**{total} artifact{'s' if total != 1 else ''}**"]
-    if counts["PASS"]:
+    if counts.get("PASS"):
         parts.append(f"\U0001f7e2 PASS: {counts['PASS']}")
-    if counts["WARN"]:
+    if counts.get("WARN"):
         parts.append(f"\U0001f7e1 WARN: {counts['WARN']}")
-    if counts["FAIL"]:
+    if counts.get("FAIL"):
         parts.append(f"\U0001f534 FAIL: {counts['FAIL']}")
-    if other:
+    if other > 0:
         parts.append(f"other: {other}")
     return "  |  ".join(parts)
 
@@ -171,7 +179,7 @@ def query_evidence(
     date_to: str,
 ) -> list[list[str]]:
     """Query evidence and return rows for the summary table."""
-    rows, _ = _query_evidence_records(
+    rows, _, _ = _query_evidence_records(
         evidence_dir=evidence_dir,
         dataset_name=dataset_name,
         verdict=verdict,
@@ -211,8 +219,8 @@ def _query_evidence_records(
     verdict: str,
     date_from: str,
     date_to: str,
-) -> tuple[list[list[str]], int]:
-    """Query evidence and return rows plus the untruncated result count."""
+) -> tuple[list[list[str]], int, dict[str, int]]:
+    """Query evidence and return rows, total count, and full verdict counts."""
     edir = evidence_dir.strip() or EVIDENCE_DIR
     history = TransformationHistory(Path(edir))
 
@@ -227,10 +235,19 @@ def _query_evidence_records(
             before=before,
         )
     except Exception as exc:  # noqa: BLE001
-        return [[f"(error: {exc})", "", "", "", "", ""]], 0
+        return [[f"(error: {exc})", "", "", "", "", ""]], 0, {}
 
     if not results:
-        return [["(no artifacts found)", "", "", "", "", ""]], 0
+        return [["(no artifacts found)", "", "", "", "", ""]], 0, {}
+
+    # Compute verdict counts from ALL results before truncation.
+    full_verdict_counts: dict[str, int] = {"PASS": 0, "WARN": 0, "FAIL": 0}
+    for artifact in results:
+        v = str(
+            artifact.get("pipeline_verdict", artifact.get("verdict", ""))
+        ).upper()
+        if v in full_verdict_counts:
+            full_verdict_counts[v] += 1
 
     rows: list[list[str]] = []
     total_results = len(results)
@@ -259,7 +276,7 @@ def _query_evidence_records(
     if truncated:
         rows.append([f"(Truncated from {total_results} to latest 1000 records)", "...", "...", "...", "...", "..."])
 
-    return rows, total_results
+    return rows, total_results, full_verdict_counts
 
 
 def load_artifact_detail(evidence_dir: str, filename: str) -> str:
@@ -268,7 +285,10 @@ def load_artifact_detail(evidence_dir: str, filename: str) -> str:
     if not fname:
         return "(select an artifact filename)"
     edir = evidence_dir.strip() or EVIDENCE_DIR
-    path = Path(edir) / fname
+    base = Path(edir).resolve()
+    path = (base / fname).resolve()
+    if not path.is_relative_to(base):
+        return "(invalid filename: path traversal rejected)"
     if not path.is_file():
         return f"(file not found: {fname})"
     try:
@@ -284,7 +304,10 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
     if not fname:
         return "_Enter an artifact filename above and click Load Artifact._"
     edir = evidence_dir.strip() or EVIDENCE_DIR
-    path = Path(edir) / fname
+    base = Path(edir).resolve()
+    path = (base / fname).resolve()
+    if not path.is_relative_to(base):
+        return "_Invalid filename: path traversal rejected_"
     if not path.is_file():
         return f"_File not found: `{fname}`_"
     try:
@@ -484,7 +507,7 @@ def build_app():  # type: ignore[no-untyped-def]
                     ed: str, ds: str, v: str, df: str, dt: str, progress: gr.Progress = gr.Progress()
                 ) -> tuple[list[list[str]], str]:
                     progress(0, desc="Querying recent pipeline evidence...")
-                    rows, total_results = _query_evidence_records(ed, ds, v, df, dt)
+                    rows, total_results, full_counts = _query_evidence_records(ed, ds, v, df, dt)
                     is_empty = len(rows) == 1 and "no artifacts" in rows[0][0].lower()
                     is_error = len(rows) == 1 and rows[0][0].startswith("(error")
                     if is_error:
@@ -495,7 +518,9 @@ def build_app():  # type: ignore[no-untyped-def]
                             "Confirm the evidence directory path is correct."
                         )
                     else:
-                        summary = _build_summary_line_with_total(rows, total_results)
+                        summary = _build_summary_line_with_total(
+                            rows, total_results, verdict_counts=full_counts,
+                        )
                     return rows, summary
 
                 query_btn.click(
@@ -645,8 +670,12 @@ def build_app():  # type: ignore[no-untyped-def]
                 queue=True,
             )
 
+        def _load_registry_on_startup(rp: str) -> tuple[list[list[str]], str]:
+            rows = load_registry_table(rp)
+            return rows, _registry_status_text(rows)
+
         app.load(
-            fn=_load_registry_with_status,
+            fn=_load_registry_on_startup,
             inputs=[reg_path],
             outputs=[reg_table, reg_status],
             queue=False,

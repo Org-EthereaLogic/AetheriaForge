@@ -34,6 +34,7 @@ class TransformationHistory:
 
     _cache: dict[str, _ArtifactCacheEntry] = {}
     _cache_lock = Lock()
+    _CACHE_MAX_ENTRIES = 8
 
     def _artifact_paths(self) -> list[Path]:
         """Return candidate JSON artifact paths sorted newest-first by name."""
@@ -81,12 +82,16 @@ class TransformationHistory:
 
         artifacts: list[dict[str, Any]] = []
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        max_workers = min(8, len(paths))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             for result in executor.map(self._parse_artifact, paths):
                 if result is not None:
                     artifacts.append(result)
 
         with self._cache_lock:
+            if len(self._cache) >= self._CACHE_MAX_ENTRIES:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
             self._cache[cache_key] = _ArtifactCacheEntry(
                 signature=signature,
                 artifacts=tuple(artifacts),
