@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from aetheriaforge.config.contract import ForgeContract
+
+logger = logging.getLogger(__name__)
 
 
 def _version_tuple(version: str) -> tuple[int, ...]:
@@ -110,6 +113,9 @@ class DatasetRegistry:
         registry = cls()
         for yaml_path in sorted(path.iterdir()):
             if yaml_path.suffix in (".yml", ".yaml"):
-                contract = ForgeContract.from_yaml(yaml_path)
-                registry.register(contract)
+                try:
+                    contract = ForgeContract.from_yaml(yaml_path)
+                    registry.register(contract)
+                except Exception as exc:
+                    logger.warning("Skipping malformed contract file %s: %s", yaml_path, exc)
         return registry

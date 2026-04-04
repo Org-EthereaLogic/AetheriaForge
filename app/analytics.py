@@ -6,6 +6,7 @@ No evidence files are read here — that is handled by the caller.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 from collections import Counter
 from datetime import datetime
@@ -17,9 +18,26 @@ import plotly.graph_objects as go
 # -- Color palettes ----------------------------------------------------------
 
 _PALETTES: dict[str, dict[str, str]] = {
-    "Brand": {"PASS": "#10B981", "WARN": "#F59E0B", "FAIL": "#F43F5E", "bar": "#8B5CF6", "line": "#6366F1"},
-    "Traffic Light": {"PASS": "#22C55E", "WARN": "#EAB308", "FAIL": "#EF4444", "bar": "#3B82F6", "line": "#2563EB"},
-    "Colorblind Safe": {"PASS": "#0077BB", "WARN": "#EE7733", "FAIL": "#CC3311", "bar": "#009988", "line": "#33BBEE"},
+    "Brand": {
+        "PASS": "#10B981", "WARN": "#F59E0B", "FAIL": "#F43F5E",
+        "bar": "#8B5CF6", "line": "#6366F1",
+    },
+    "Traffic Light": {
+        "PASS": "#22C55E", "WARN": "#EAB308", "FAIL": "#EF4444",
+        "bar": "#3B82F6", "line": "#2563EB",
+    },
+    "Colorblind Safe": {
+        "PASS": "#0077BB", "WARN": "#EE7733", "FAIL": "#CC3311",
+        "bar": "#009988", "line": "#33BBEE",
+    },
+    "Cyberpunk": {
+        "PASS": "#00FF00", "WARN": "#FFE600", "FAIL": "#FF003C",
+        "bar": "#00E5FF", "line": "#9D00FF",
+    },
+    "Pastel": {
+        "PASS": "#86EFAC", "WARN": "#FDE047", "FAIL": "#FCA5A5",
+        "bar": "#C4B5FD", "line": "#93C5FD",
+    },
 }
 
 _LAYOUT_DEFAULTS: dict[str, Any] = {
@@ -36,20 +54,27 @@ def _get_palette(theme: str) -> dict[str, str]:
 
 # -- Data loading ------------------------------------------------------------
 
+def _parse_analytics_artifact(fpath: Path) -> dict[str, Any] | None:
+    try:
+        return json.loads(fpath.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def build_analytics_data(evidence_dir: str) -> list[dict[str, Any]]:
     """Load all evidence JSON files and return parsed records."""
     path = Path(evidence_dir)
     if not path.is_dir():
         return []
+
+    paths = [p for p in sorted(path.iterdir(), reverse=True) if p.suffix == ".json"]
     records: list[dict[str, Any]] = []
-    for fpath in sorted(path.iterdir(), reverse=True):
-        if fpath.suffix != ".json":
-            continue
-        try:
-            data = json.loads(fpath.read_text())
-            records.append(data)
-        except (json.JSONDecodeError, OSError):
-            continue
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for result in executor.map(_parse_analytics_artifact, paths):
+            if result is not None:
+                records.append(result)
+
     return records
 
 

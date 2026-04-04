@@ -42,6 +42,23 @@ _ALERT_ROSE = "#F43F5E"
 _SLATE_MUTED = "#94A3B8"
 _VERDICT_CIRCLES = {"PASS": "\U0001f7e2 PASS", "FAIL": "\U0001f534 FAIL", "WARN": "\U0001f7e1 WARN"}
 
+_ASSETS = Path(__file__).parent.parent / "assets" / "aetheriaforge-brand-system"
+
+
+def _get_logo_uris() -> tuple[str | None, str | None]:
+    """Encode the light and dark brand logos as base64 data URIs."""
+    import base64
+
+    def _b64(path: Path) -> str | None:
+        if not path.is_file():
+            return None
+        return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+
+    return (
+        _b64(_ASSETS / "variants" / "logo-light.png"),
+        _b64(_ASSETS / "variants" / "logo-dark.png"),
+    )
+
 
 # -- Helpers -----------------------------------------------------------------
 
@@ -282,6 +299,9 @@ _AF_CSS = """
     .af-tab-desc { color: var(--body-text-color-subdued); font-size: 0.9em; margin-bottom: 12px; }
     .af-empty-state { text-align: center; padding: 24px 16px;
         font-size: 0.95em; color: var(--body-text-color-subdued); }
+    #af-logo-dark { display: none !important; }
+    .dark #af-logo-dark, :root.dark #af-logo-dark, body.dark #af-logo-dark { display: block !important; }
+    .dark #af-logo-light, :root.dark #af-logo-light, body.dark #af-logo-light { display: none !important; }
 """
 
 
@@ -301,11 +321,28 @@ def build_app():  # type: ignore[no-untyped-def]
 
     with ctx as app:
         # ---- Header ----
-        gr.Markdown(
-            "## \u2692\ufe0f \u00c6theriaForge\n"
-            f"<span style='color:{_SLATE_MUTED};font-size:0.85em;'>"
-            "Read-only operator dashboard \u2014 forge registry, transformation evidence, analytics</span>",
-        )
+        logo_light_uri, logo_dark_uri = _get_logo_uris()
+        if logo_light_uri and logo_dark_uri:
+            gr.HTML(
+                '<div style="display:flex;align-items:center;gap:16px;'
+                'padding:12px 0 8px 0;">'
+                f'<img id="af-logo-light" src="{logo_light_uri}"'
+                ' alt="\u00c6theriaForge" style="height:64px;width:auto;" />'
+                f'<img id="af-logo-dark" src="{logo_dark_uri}"'
+                ' alt="\u00c6theriaForge" style="height:64px;width:auto;" />'
+                '<span style="color:var(--body-text-color-subdued);'
+                'font-size:0.85em;">'
+                'Read-only operator dashboard \u2014 forge registry,'
+                ' transformation evidence, analytics</span>'
+                '</div>'
+            )
+        else:
+            gr.Markdown(
+                "## \u2692\ufe0f \u00c6theriaForge\n"
+                f"<span style='color:{_SLATE_MUTED};font-size:0.85em;'>"
+                "Read-only operator dashboard \u2014 forge registry,"
+                " transformation evidence, analytics</span>",
+            )
 
         # ---- Tabs ----
         with gr.Tabs(elem_id="tabs") as tabs:
@@ -496,7 +533,10 @@ def build_app():  # type: ignore[no-untyped-def]
                         label="Evidence Directory", value=EVIDENCE_DIR, scale=3,
                     )
                     color_theme = gr.Dropdown(
-                        choices=["Brand", "Traffic Light", "Colorblind Safe"],
+                        choices=[
+                            "Brand", "Traffic Light", "Colorblind Safe",
+                            "Cyberpunk", "Pastel",
+                        ],
                         value="Brand", label="Color Theme", scale=1,
                     )
                     ana_btn = gr.Button("Refresh", variant="primary", scale=1)

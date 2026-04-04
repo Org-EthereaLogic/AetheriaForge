@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
 from datetime import datetime
@@ -23,22 +24,32 @@ class TransformationHistory:
 
     # -- core read ------------------------------------------------------------
 
+    def _parse_artifact(self, path: Path) -> dict[str, Any] | None:
+        """Parse a single evidence JSON file, returning None if malformed."""
+        try:
+            data = json.loads(path.read_text())
+            data["_evidence_path"] = str(path)
+            return data  # type: ignore[no-any-return]
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Skipping malformed evidence file %s: %s", path, exc)
+            return None
+
     def _load_artifacts(self) -> list[dict[str, Any]]:
         """Load and parse all evidence JSON files, skipping malformed ones."""
+        if not self.evidence_dir.is_dir():
+            return []
+
+        paths = [
+            p for p in sorted(self.evidence_dir.iterdir(), reverse=True)
+            if p.suffix == ".json"
+        ]
+
         artifacts: list[dict[str, Any]] = []
 
-        if not self.evidence_dir.is_dir():
-            return artifacts
-
-        for path in sorted(self.evidence_dir.iterdir(), reverse=True):
-            if not path.suffix == ".json":
-                continue
-            try:
-                data = json.loads(path.read_text())
-                data["_evidence_path"] = str(path)
-                artifacts.append(data)
-            except (json.JSONDecodeError, OSError) as exc:
-                logger.warning("Skipping malformed evidence file %s: %s", path, exc)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for result in executor.map(self._parse_artifact, paths):
+                if result is not None:
+                    artifacts.append(result)
 
         return artifacts
 
