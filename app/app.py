@@ -189,7 +189,8 @@ def query_evidence(
         return [["(no artifacts found)", "", "", "", "", ""]]
 
     rows: list[list[str]] = []
-    for artifact in results:
+    truncated = len(results) > 1000
+    for artifact in results[:1000]:
         filename = Path(artifact.get("_evidence_path", "")).name
         ds_name = artifact.get("dataset_name", "")
         v = artifact.get("pipeline_verdict", artifact.get("verdict", ""))
@@ -209,6 +210,10 @@ def query_evidence(
             record_str,
             _fmt_timestamp(str(ts)),
         ])
+
+    if truncated:
+        rows.append([f"(Truncated from {len(results)} to latest 1000 records)", "...", "...", "...", "...", "..."])
+
     return rows
 
 
@@ -376,8 +381,9 @@ def build_app():  # type: ignore[no-untyped-def]
                 )
 
                 def _load_registry_with_status(
-                    rp: str,
+                    rp: str, progress: gr.Progress = gr.Progress()
                 ) -> tuple[list[list[str]], str]:
+                    progress(0, desc="Loading registry...")
                     rows = load_registry_table(rp)
                     return rows, _registry_status_text(rows)
 
@@ -385,8 +391,7 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_load_registry_with_status,
                     inputs=[reg_path],
                     outputs=[reg_table, reg_status],
-                    queue=False,
-                    show_progress="hidden",
+                    queue=True,
                 )
 
             # ---- Tab 2: Transformation Status ----
@@ -431,8 +436,9 @@ def build_app():  # type: ignore[no-untyped-def]
                 )
 
                 def _query_with_summary(
-                    ed: str, ds: str, v: str, df: str, dt: str,
+                    ed: str, ds: str, v: str, df: str, dt: str, progress: gr.Progress = gr.Progress()
                 ) -> tuple[list[list[str]], str]:
+                    progress(0, desc="Querying recent pipeline evidence...")
                     rows = query_evidence(ed, ds, v, df, dt)
                     is_empty = len(rows) == 1 and "no artifacts" in rows[0][0].lower()
                     is_error = len(rows) == 1 and rows[0][0].startswith("(error")
@@ -451,8 +457,7 @@ def build_app():  # type: ignore[no-untyped-def]
                     fn=_query_with_summary,
                     inputs=[ev_dir, ds_filter, verdict_filter, from_filter, to_filter],
                     outputs=[status_table, run_summary],
-                    queue=False,
-                    show_progress="hidden",
+                    queue=True,
                 )
 
             # ---- Tab 3: Evidence Explorer ----
@@ -567,16 +572,22 @@ def build_app():  # type: ignore[no-untyped-def]
                     trend_plot = gr.Plot(label="Coherence Trend")
 
                 def _refresh_analytics(
-                    edir: str, theme: str,
+                    edir: str, theme: str, progress: gr.Progress = gr.Progress()
                 ) -> tuple[Any, Any, Any, Any, str]:
+                    progress(0, desc="Loading artifacts...")
                     records = build_analytics_data(edir.strip() or EVIDENCE_DIR)
                     if not records:
                         return None, None, None, None, "No evidence artifacts found."
+                    progress(0.4, desc="Building verdict bar...")
                     verdict_fig = build_verdict_bar(records, theme)
+                    progress(0.6, desc="Building coherence histogram...")
                     hist_fig = build_coherence_histogram(records, theme)
+                    progress(0.8, desc="Building activity volume...")
                     vol_fig = build_daily_volume(records, theme)
+                    progress(0.9, desc="Building coherence trend...")
                     trend_fig = build_coherence_trend(records, theme)
                     total = len(records)
+                    progress(1.0, desc="Render complete")
                     return (
                         verdict_fig, hist_fig, vol_fig, trend_fig,
                         f"**{total} artifacts** analyzed",
@@ -586,8 +597,7 @@ def build_app():  # type: ignore[no-untyped-def]
                 fn=_refresh_analytics,
                 inputs=[ana_dir, color_theme],
                 outputs=[verdict_plot, coherence_hist_plot, volume_plot, trend_plot, ana_status],
-                queue=False,
-                show_progress="hidden",
+                queue=True,
             )
 
         app.load(
