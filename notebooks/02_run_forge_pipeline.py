@@ -22,7 +22,7 @@ dbutils.widgets.text(  # type: ignore[name-defined]
     "contract_path", "", "Path to forge contract YAML (leave blank for template)"
 )
 dbutils.widgets.text(  # type: ignore[name-defined]
-    "evidence_dir", "/tmp/aetheriaforge_evidence", "Evidence output directory"
+    "evidence_dir", "", "Evidence output directory (leave blank for shared volume default)"
 )
 dbutils.widgets.text(  # type: ignore[name-defined]
     "target_layer", "silver", "Target Medallion layer (bronze, silver, gold)"
@@ -36,12 +36,64 @@ target_layer = dbutils.widgets.get("target_layer")  # type: ignore[name-defined]
 
 # COMMAND ----------
 
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _resolve_install_target() -> str:
+    """Prefer the bundle-uploaded repo, then fall back to GitHub."""
+    try:
+        notebook_path = (
+            dbutils.notebook.entry_point  # type: ignore[name-defined]
+            .getDbutils()
+            .notebook()
+            .getContext()
+            .notebookPath()
+            .get()
+        )
+        workspace_path = Path("/Workspace") / notebook_path.lstrip("/")
+        for parent in workspace_path.parents:
+            if (
+                (parent / "pyproject.toml").exists()
+                and (parent / "src" / "aetheriaforge").exists()
+            ):
+                return str(parent)
+    except Exception:
+        pass
+    return "git+https://github.com/Org-EthereaLogic/AetheriaForge.git"
+
+
+try:
+    from aetheriaforge.config.contract import ForgeContract
+except ModuleNotFoundError:
+    install_target = _resolve_install_target()
+    print(f"Installing AetheriaForge package from: {install_target}")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "-q", install_target]
+    )
+    from aetheriaforge.config.contract import ForgeContract
+
+from aetheriaforge.runtime_paths import shared_evidence_dir
+
+
+def _resolve_evidence_dir() -> Path:
+    """Pick an explicit evidence dir or the shared Unity Catalog volume path."""
+    if evidence_dir.strip():
+        return Path(evidence_dir)
+    if catalog.strip():
+        return shared_evidence_dir(catalog, schema)
+    return Path("/tmp/aetheriaforge_evidence")
+
+
+resolved_evidence_dir = _resolve_evidence_dir()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Load Contract
 
 # COMMAND ----------
-
-from pathlib import Path
 
 from aetheriaforge.config.contract import ForgeContract
 from aetheriaforge.paths import templates_dir
@@ -55,6 +107,7 @@ contract = ForgeContract.from_yaml(yaml_path)
 print(f"Contract loaded: {contract.dataset_name} v{contract.dataset_version}")
 print(f"Target layer:    {target_layer}")
 print(f"Threshold:       {contract.threshold_for_layer(target_layer)}")
+print(f"Evidence dir:    {resolved_evidence_dir}")
 
 # COMMAND ----------
 
@@ -115,7 +168,7 @@ print(f"Execution mode:  {_execution_mode}")
 from aetheriaforge.evidence.writer import EvidenceWriter
 from aetheriaforge.orchestration.pipeline import ForgePipeline
 
-writer = EvidenceWriter(Path(evidence_dir))
+writer = EvidenceWriter(resolved_evidence_dir)
 pipeline = ForgePipeline(contract, evidence_writer=writer)
 
 result = pipeline.run(

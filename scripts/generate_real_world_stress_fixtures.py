@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import TextIOWrapper
@@ -313,9 +314,9 @@ def _iter_dataset_chunks(
     *,
     chunk_size: int,
     max_chunks: int,
-) -> list[pd.DataFrame]:
-    """Stream up to ``max_chunks`` clean chunks from the dataset source."""
-    chunks: list[pd.DataFrame] = []
+) -> Iterator[pd.DataFrame]:
+    """Yield up to ``max_chunks`` clean chunks from the dataset source."""
+    emitted = 0
     with urlopen(spec.source_url) as response:
         reader = csv.DictReader(
             TextIOWrapper(response, encoding="utf-8", errors="replace")
@@ -332,16 +333,15 @@ def _iter_dataset_chunks(
             rows = []
             if normalized.empty:
                 continue
-            chunks.append(normalized)
-            if len(chunks) >= max_chunks:
+            yield normalized
+            emitted += 1
+            if emitted >= max_chunks:
                 break
 
-        if rows and len(chunks) < max_chunks:
+        if rows and emitted < max_chunks:
             normalized = _normalize_chunk(pd.DataFrame.from_records(rows), spec)
             if not normalized.empty:
-                chunks.append(normalized)
-
-    return chunks
+                yield normalized
 
 
 def _parse_args() -> argparse.Namespace:
@@ -405,14 +405,19 @@ def main() -> int:
         verdict_counts = {label: 0 for label in ("PASS", "WARN", "FAIL")}
         processed_rows = 0
         detailed_runs = 0
+        chunks_used = 0
 
-        dataset_chunks = _iter_dataset_chunks(
-            spec,
-            chunk_size=args.chunk_size,
-            max_chunks=args.max_chunks,
-        )
-
-        for chunk_index, base_chunk in enumerate(dataset_chunks, start=1):
+        # Process each streamed chunk immediately so the first evidence artifacts
+        # appear as soon as the remote source yields enough rows.
+        for chunk_index, base_chunk in enumerate(
+            _iter_dataset_chunks(
+                spec,
+                chunk_size=args.chunk_size,
+                max_chunks=args.max_chunks,
+            ),
+            start=1,
+        ):
+            chunks_used = chunk_index
             processed_rows += len(base_chunk)
             detailed = args.detailed_every > 0 and chunk_index % args.detailed_every == 0
 
@@ -443,7 +448,7 @@ def main() -> int:
                 "catalog_url": spec.catalog_url,
                 "source_url": spec.source_url,
                 "contract_path": str(contract_path),
-                "chunks_used": len(dataset_chunks),
+                "chunks_used": chunks_used,
                 "chunk_size": args.chunk_size,
                 "rows_processed": processed_rows,
                 "artifact_count": sum(verdict_counts.values()),

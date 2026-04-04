@@ -13,12 +13,18 @@ variables:
   schema:
     description: Unity Catalog schema name
     default: default
+  runtime_volume:
+    description: Unity Catalog volume name shared by the Databricks app and job
+    default: aetheriaforge_runtime
   contract_path:
     description: Path to the forge contract YAML (leave blank for template/demo)
     default: ""
+  contracts_dir:
+    description: Shared forge contract directory for the Databricks app
+    default: /Volumes/${var.catalog}/${var.schema}/${var.runtime_volume}/contracts
   evidence_dir:
-    description: Evidence output directory
-    default: /tmp/aetheriaforge_evidence
+    description: Shared evidence output directory for the Databricks app and job
+    default: /Volumes/${var.catalog}/${var.schema}/${var.runtime_volume}/evidence
 
 targets:
   dev:

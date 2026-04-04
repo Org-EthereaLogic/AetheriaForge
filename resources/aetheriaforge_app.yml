@@ -10,6 +10,6 @@ resources:
           - app/app.py
         env:
           - name: CONTRACTS_DIR
-            value: /tmp/aetheriaforge_contracts
+            value: ${var.contracts_dir}
           - name: EVIDENCE_DIR
-            value: /tmp/aetheriaforge_evidence
+            value: ${var.evidence_dir}
