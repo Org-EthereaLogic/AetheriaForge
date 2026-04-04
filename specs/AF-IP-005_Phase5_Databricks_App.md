@@ -151,5 +151,5 @@ evidence and contract files.
 
 - All acceptance criteria verified
 - `make lint` and `make test` pass
-- No placeholder markers in new files
+- No forbidden stub markers in new files
 - `app/` directory contains all files listed in Scope

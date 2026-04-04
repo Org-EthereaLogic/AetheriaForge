@@ -13,7 +13,7 @@ Implement scoped ÆtheriaForge work under the canonical SDLC contract.
 ## Rules
 
 - Do not treat narrative docs as canonical over `specs/`.
-- Do not introduce hidden behavior, unverifiable claims, or placeholder text.
+- Do not introduce hidden behavior, unverifiable claims, or stub text.
 - Keep evidence and verification expectations explicit.
 - No runtime dependency on DriftSentinel or sibling project clones.
 - No proprietary UMIF material in v1.x codebase.

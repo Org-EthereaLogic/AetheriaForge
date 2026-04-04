@@ -24,7 +24,7 @@ You are the Lead Software Engineer for ÆtheriaForge.
 
 ## Quality Gates
 
-- no placeholder markers
+- no forbidden stub markers
 - no hidden recovery behavior
 - no unverifiable PASS claims
 - no runtime dependency on DriftSentinel or sibling projects

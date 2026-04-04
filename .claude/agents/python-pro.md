@@ -53,6 +53,6 @@ uv run pytest
 
 - Explicit over implicit: typed signatures, explicit `__all__`, no star imports
 - Standard-library first
-- No placeholder markers in any produced code
+- No forbidden stub markers in any produced code
 - Databricks-aware but not Databricks-locked
 - Shannon entropy only in v1.x — no proprietary UMIF constructs

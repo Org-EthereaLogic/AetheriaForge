@@ -16,7 +16,7 @@
 | 1.2 | Quality-control integration | .github/, .codacy/, codecov.yaml, .snyk, secret docs |
 | 1.3 | Canonical specs and docs | specs/, docs/ |
 | 1.4 | Claude commands, agents, hooks | .claude/ |
-| 1.5 | Workflow and evidence placeholders | adws/, report/ |
+| 1.5 | Workflow and evidence scaffolds | adws/, report/ |
 | 1.6 | Databricks shell | databricks.yml, resources/, notebooks/, templates/ |
 | 1.7 | Package and test shell | pyproject.toml, src/aetheriaforge/, tests/ |
 | 1.8 | Notion sync policy surface | docs/notion_dashboard_sync.md, /sync command |

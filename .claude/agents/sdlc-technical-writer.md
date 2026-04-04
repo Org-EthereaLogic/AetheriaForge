@@ -19,7 +19,7 @@ You are the SDLC Technical Writer for ÆtheriaForge.
 ## Working Rules
 
 - treat `specs/` as canonical
-- avoid placeholder text and vague claims
+- avoid stub text and vague claims
 - use concise document metadata tables
 - update `AF-TM-001_Traceability_Matrix.md` when requirements or verification
   surfaces change

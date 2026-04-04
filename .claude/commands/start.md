@@ -9,7 +9,7 @@ Set up the local development environment and verify the project is functional.
    uv sync --all-groups
    ```
 
-2. Run the placeholder scan:
+2. Run the stub-marker scan:
    ```
    PATTERN='TO''DO|FIX''ME|TB''D|PLACE''HOLDER'; rg -n "$PATTERN" specs .claude CLAUDE.md docs
    ```

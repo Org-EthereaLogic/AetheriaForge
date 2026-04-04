@@ -13,7 +13,7 @@
 - Canonical `specs/AF-*.md` suite exists
 - `.claude/commands/`, `.claude/agents/`, `.claude/hooks/` exist
 - Quality-control integration files present (`.codacy/`, `codecov.yaml`, `.snyk`)
-- No placeholder markers in canonical surfaces
+- No forbidden stub markers in canonical surfaces
 
 ## 2. Forge Engine Verification
 

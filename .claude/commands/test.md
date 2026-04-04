@@ -17,8 +17,8 @@ TEST_COMMAND_TIMEOUT: 5 minutes
 
 ### 1. Placeholder Scan
 - Command: `PATTERN='TO''DO|FIX''ME|TB''D|PLACE''HOLDER'; rg -n "$PATTERN" specs .claude CLAUDE.md docs`
-- test_name: `placeholder_scan`
-- test_purpose: "Ensures no forbidden placeholder markers remain in canonical surfaces"
+- test_name: `marker_scan`
+- test_purpose: "Ensures no forbidden stub markers remain in canonical surfaces"
 
 ### 2. Lint
 - Command: `uv run ruff check .`

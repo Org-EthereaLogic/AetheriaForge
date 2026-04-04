@@ -14,7 +14,7 @@ task: $ARGUMENTS
    - If the task would modify `specs/`, `report/`, or product control logic,
      stop and use `/plan` + `/implement` instead.
 3. Apply the smallest possible change.
-4. Run placeholder scan, `uv run ruff check .`, and `uv run pytest`.
+4. Run the stub-marker scan, `uv run ruff check .`, and `uv run pytest`.
 
 ## Report
 

@@ -28,7 +28,7 @@ If the feature belongs elsewhere, stop and explain why.
 
 ## Validation Commands
 
-- placeholder scan
+- stub-marker scan
 - `uv run ruff check .`
 - `uv run pytest`
 - `make bundle-validate CATALOG=<existing_uc_catalog> PROFILE=<profile>` (if

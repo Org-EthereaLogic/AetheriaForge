@@ -14,7 +14,7 @@ scope: $ARGUMENTS
 - If `scope` is provided, narrow the audit accordingly
 
 ### Phase 2: Governance Compliance
-- Run placeholder scan
+- Run stub-marker scan
 - Run `uv run ruff check .`
 - Confirm `docs/` does not override `specs/` on any canonical claim
 - Confirm quality-control files exist: `.github/workflows/ci.yml`, `.codacy/`,

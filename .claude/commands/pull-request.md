@@ -10,7 +10,7 @@ target_branch: $ARGUMENTS (default: main)
 
 1. `git diff origin/main...HEAD --stat`
 2. `git log origin/main..HEAD --oneline`
-3. Run placeholder scan — must return clean
+3. Run stub-marker scan — must return clean
 4. `uv run ruff check .` — must pass
 5. `uv run pytest` — must pass
 6. `make bundle-catalog-check CATALOG=<existing_uc_catalog> PROFILE=<profile>`
