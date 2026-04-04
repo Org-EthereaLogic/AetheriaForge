@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document ID | AF-IP-005 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Author | Anthony Johnson |
-| Date | 2026-04-03 |
+| Date | 2026-04-04 |
 | Parent | AF-IP-001 Phase 5 |
 
 ## Objective
@@ -41,8 +41,8 @@ threshold configuration.
 
 **Display:**
 - Status line (count of registered datasets or empty-state guidance)
-- Table: Dataset Name, Version, Source (catalog.schema.table), Target
-  (catalog.schema.table), Engine, Silver Threshold
+- Table: Dataset Name, Version, Source (schema.table), Target
+  (schema.table), Engine, Silver Min
 
 ### Tab 2: Transformation Status
 

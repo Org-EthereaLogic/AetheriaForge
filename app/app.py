@@ -118,8 +118,8 @@ def load_registry_table(contracts_dir: str) -> list[list[str]]:
     for name in datasets:
         for version in registry.list_versions(name):
             contract = registry.get(name, version)
-            source = f"{contract.source_catalog}.{contract.source_schema}.{contract.source_table}"
-            target = f"{contract.target_catalog}.{contract.target_schema}.{contract.target_table}"
+            source = f"{contract.source_schema}.{contract.source_table}"
+            target = f"{contract.target_schema}.{contract.target_table}"
             rows.append([
                 name,
                 version,
@@ -303,6 +303,8 @@ _AF_CSS = """
     #af-logo-dark { display: none !important; }
     .dark #af-logo-dark, :root.dark #af-logo-dark, body.dark #af-logo-dark { display: block !important; }
     .dark #af-logo-light, :root.dark #af-logo-light, body.dark #af-logo-light { display: none !important; }
+    .table-container { overflow-x: auto !important; }
+    .disable_click { overflow: visible !important; }
 """
 
 
@@ -367,9 +369,10 @@ def build_app():  # type: ignore[no-untyped-def]
                 )
                 reg_table = gr.Dataframe(
                     headers=[
-                        "Dataset", "Version", "Source", "Target", "Engine", "Silver Threshold",
+                        "Dataset", "Version", "Source", "Target", "Engine", "Silver Min",
                     ],
-                    interactive=False, wrap=False,
+                    column_widths=["15%", "8%", "27%", "27%", "10%", "13%"],
+                    interactive=False, wrap=True,
                 )
 
                 def _load_registry_with_status(

@@ -41,6 +41,7 @@ _LAYOUT_DEFAULTS: dict[str, Any] = {
     "plot_bgcolor": "rgba(0,0,0,0)",
     "font": {"color": "#CBD5E1"},
     "margin": {"l": 40, "r": 20, "t": 40, "b": 40},
+    "height": 320,
 }
 
 
