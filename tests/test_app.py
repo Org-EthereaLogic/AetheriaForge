@@ -46,12 +46,22 @@ def _make_contract_yaml(path: Path, name: str, version: str = "1.0.0") -> Path:
     return filepath
 
 
-def _make_evidence_json(path: Path, name: str, verdict: str, score: float) -> Path:
+def _make_evidence_json(
+    path: Path,
+    name: str,
+    verdict: str,
+    score: float,
+    execution_mode: str = "unverified",
+) -> Path:
     """Write a minimal evidence artifact and return its path."""
     data = {
         "event": "pipeline_result",
         "dataset_name": name,
         "pipeline_verdict": verdict,
+        "execution_mode": execution_mode,
+        "source_location": "cat.bronze.raw",
+        "target_location": "cat.silver.forged",
+        "contract_version": "1.0.0",
         "run_at": "2026-04-03T14:00:00+00:00",
         "forge_result": {
             "coherence_score": score,
@@ -91,8 +101,8 @@ class TestBuildSummaryLine:
 
     def test_valid_rows(self) -> None:
         rows = [
-            ["f1.json", "ds_a", "\U0001f7e2 PASS", "0.85", "100 \u2192 95", "Apr 03"],
-            ["f2.json", "ds_b", "\U0001f534 FAIL", "0.50", "100 \u2192 90", "Apr 03"],
+            ["f1.json", "ds_a", "\U0001f7e2 PASS", "\u2705 contract_backed", "0.85", "100 \u2192 95", "Apr 03"],
+            ["f2.json", "ds_b", "\U0001f534 FAIL", "\u2753 unverified", "0.50", "100 \u2192 90", "Apr 03"],
         ]
         result = _build_summary_line(rows)
         assert "2 artifacts" in result
@@ -101,9 +111,9 @@ class TestBuildSummaryLine:
 
     def test_truncation_row_does_not_count_as_other(self) -> None:
         rows = [
-            ["f1.json", "ds_a", "\U0001f7e2 PASS", "0.85", "100 \u2192 95", "Apr 03"],
-            ["f2.json", "ds_b", "\U0001f534 FAIL", "0.50", "100 \u2192 90", "Apr 03"],
-            ["(Truncated from 1008 to latest 1000 records)", "...", "...", "...", "...", "..."],
+            ["f1.json", "ds_a", "\U0001f7e2 PASS", "\u2705 contract_backed", "0.85", "100 \u2192 95", "Apr 03"],
+            ["f2.json", "ds_b", "\U0001f534 FAIL", "\u2753 unverified", "0.50", "100 \u2192 90", "Apr 03"],
+            ["(Truncated from 1008 to latest 1000 records)", "...", "...", "...", "...", "...", "..."],
         ]
         result = _build_summary_line_with_total(rows, total_records=1008)
         assert "1008 artifacts" in result
@@ -176,6 +186,18 @@ class TestQueryEvidence:
         assert len(rows) == 1
         assert rows[0][1] == "orders"
 
+    def test_mode_column_present(self, tmp_path: Path) -> None:
+        _make_evidence_json(tmp_path, "orders", "PASS", 0.85, execution_mode="demo")
+        rows = query_evidence(str(tmp_path), "", "", "", "")
+        assert len(rows) == 1
+        # Mode is column index 3
+        assert "demo" in rows[0][3]
+
+    def test_contract_backed_mode_display(self, tmp_path: Path) -> None:
+        _make_evidence_json(tmp_path, "orders", "PASS", 0.85, execution_mode="contract_backed")
+        rows = query_evidence(str(tmp_path), "", "", "", "")
+        assert "contract_backed" in rows[0][3]
+
 
 # -- load_artifact_detail ----------------------------------------------------
 
@@ -214,6 +236,10 @@ class TestLoadArtifactMeta:
         assert "orders" in result
         assert "PASS" in result
         assert "0.85" in result
+        # Provenance fields must appear in metadata display.
+        assert "unverified" in result
+        assert "cat.bronze.raw" in result
+        assert "v1.0.0" in result
 
 
 # -- build_analytics_data ----------------------------------------------------

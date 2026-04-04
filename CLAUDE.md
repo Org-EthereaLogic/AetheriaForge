@@ -71,7 +71,7 @@ When prior repository patterns conflict, use this precedence:
 
 | Surface | Target |
 | --- | --- |
-| Notion dashboard | (to be configured after scaffold is verified) |
+| Notion dashboard | [AetheriaForge UMIF Data Quality Drift Foundry](https://www.notion.so/33af5d74541842d8bf9da6bdeeb88956) |
 | Sync policy | `docs/notion_dashboard_sync.md` |
 
 ## File Map

@@ -5,6 +5,7 @@ Traces: AF-SR-002, AF-FR-005, AF-FR-006, AF-FR-012
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -139,7 +140,7 @@ def test_forge_warn_verdict() -> None:
 
 
 def test_forge_writes_evidence(contract: ForgeContract, tmp_path: Path) -> None:
-    """ForgeEngine with an EvidenceWriter creates an evidence artifact on disk."""
+    """ForgeEngine with an EvidenceWriter creates a valid evidence artifact."""
     writer = EvidenceWriter(tmp_path / "evidence")
     engine = ForgeEngine(contract, evidence_writer=writer)
     source = _diverse_df()
@@ -147,6 +148,12 @@ def test_forge_writes_evidence(contract: ForgeContract, tmp_path: Path) -> None:
 
     assert result.evidence_path is not None
     assert Path(result.evidence_path).exists()
+    # Verify content is valid and contains expected fields.
+    artifact = json.loads(Path(result.evidence_path).read_text())
+    assert artifact["event"] == "forge_result"
+    assert artifact["dataset_name"] == "test_ds"
+    assert isinstance(artifact["coherence_score"], float)
+    assert artifact["verdict"] in {"PASS", "WARN", "FAIL"}
 
 
 def test_forge_no_evidence_writer(contract: ForgeContract) -> None:

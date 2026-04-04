@@ -40,6 +40,9 @@ def _df_summary(df: pd.DataFrame) -> dict[str, int]:
     return {"rows": len(df), "columns": len(df.columns)}
 
 
+EXECUTION_MODES = frozenset({"demo", "notebook", "contract_backed", "unverified"})
+
+
 @dataclass
 class PipelineResult:
     """Outcome of a full forge pipeline run."""
@@ -52,6 +55,10 @@ class PipelineResult:
     resolution_result: ResolutionResult | None = None
     temporal_result: TemporalResult | None = None
     evidence_path: str | None = None
+    execution_mode: str = "unverified"
+    source_location: str = ""
+    target_location: str = ""
+    contract_version: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         """Return the result as a dictionary with an ``event`` key."""
@@ -60,6 +67,10 @@ class PipelineResult:
             "dataset_name": self.dataset_name,
             "pipeline_verdict": self.pipeline_verdict,
             "run_at": self.run_at,
+            "execution_mode": self.execution_mode,
+            "source_location": self.source_location,
+            "target_location": self.target_location,
+            "contract_version": self.contract_version,
             "forge_result": self.forge_result.as_dict(),
             "evidence_path": self.evidence_path,
         }
@@ -108,13 +119,20 @@ class ForgePipeline:
         resolution_policy: ResolutionPolicy | None = None,
         temporal_config: TemporalConfig | None = None,
         target_layer: str = "silver",
+        execution_mode: str = "unverified",
     ) -> PipelineResult:
         """Execute the full forge pipeline and return a :class:`PipelineResult`.
 
         Stages execute in order: schema enforcement, forge scoring, entity
         resolution, temporal reconciliation.  Each stage is optional and
         controlled by the provided arguments.
+
+        *execution_mode* is recorded in the evidence artifact to distinguish
+        demo, notebook, contract-backed, and unverified runs.
         """
+        if execution_mode not in EXECUTION_MODES:
+            msg = f"Invalid execution_mode {execution_mode!r}; must be one of {sorted(EXECUTION_MODES)}"
+            raise ValueError(msg)
         verdicts: list[str] = []
         enforcement_result: EnforcementResult | None = None
         resolution_result: ResolutionResult | None = None
@@ -156,6 +174,15 @@ class ForgePipeline:
         pipeline_verdict = _worst_verdict(*verdicts) if verdicts else "PASS"
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 
+        # Build provenance strings from the contract.
+        src = self.contract
+        source_loc = ".".join(
+            p for p in (src.source_catalog, src.source_schema, src.source_table) if p
+        )
+        target_loc = ".".join(
+            p for p in (src.target_catalog, src.target_schema, src.target_table) if p
+        )
+
         result = PipelineResult(
             dataset_name=self.contract.dataset_name,
             pipeline_verdict=pipeline_verdict,
@@ -164,6 +191,10 @@ class ForgePipeline:
             enforcement_result=enforcement_result,
             resolution_result=resolution_result,
             temporal_result=temporal_result,
+            execution_mode=execution_mode,
+            source_location=source_loc,
+            target_location=target_loc,
+            contract_version=self.contract.dataset_version,
         )
 
         if self.evidence_writer is not None:

@@ -41,6 +41,12 @@ _TRUST_EMERALD = "#10B981"
 _ALERT_ROSE = "#F43F5E"
 _SLATE_MUTED = "#94A3B8"
 _VERDICT_CIRCLES = {"PASS": "\U0001f7e2 PASS", "FAIL": "\U0001f534 FAIL", "WARN": "\U0001f7e1 WARN"}
+_MODE_LABELS = {
+    "contract_backed": "\u2705 contract_backed",
+    "demo": "\u26a0\ufe0f demo",
+    "notebook": "\U0001f4d3 notebook",
+    "unverified": "\u2753 unverified",
+}
 
 _ASSETS = Path(__file__).parent.parent / "assets" / "aetheriaforge-brand-system"
 
@@ -235,10 +241,10 @@ def _query_evidence_records(
             before=before,
         )
     except Exception as exc:  # noqa: BLE001
-        return [[f"(error: {exc})", "", "", "", "", ""]], 0, {}
+        return [[f"(error: {exc})", "", "", "", "", "", ""]], 0, {}
 
     if not results:
-        return [["(no artifacts found)", "", "", "", "", ""]], 0, {}
+        return [["(no artifacts found)", "", "", "", "", "", ""]], 0, {}
 
     # Compute verdict counts from ALL results before truncation.
     full_verdict_counts: dict[str, int] = {"PASS": 0, "WARN": 0, "FAIL": 0}
@@ -264,17 +270,21 @@ def _query_evidence_records(
         records_out = artifact.get("forge_result", {}).get("records_out", "")
         record_str = f"{records_in} \u2192 {records_out}" if records_in != "" else ""
         ts = artifact.get("run_at", artifact.get("forged_at", ""))
+        raw_mode = str(artifact.get("execution_mode", "unverified"))
+        mode_display = _MODE_LABELS.get(raw_mode, f"\u2753 {raw_mode}")
         rows.append([
             filename,
             str(ds_name),
             verdict_display,
+            mode_display,
             str(score),
             record_str,
             _fmt_timestamp(str(ts)),
         ])
 
     if truncated:
-        rows.append([f"(Truncated from {total_results} to latest 1000 records)", "...", "...", "...", "...", "..."])
+        trunc_msg = f"(Truncated from {total_results} to latest 1000 records)"
+        rows.append([trunc_msg, "...", "...", "...", "...", "...", "..."])
 
     return rows, total_results, full_verdict_counts
 
@@ -320,12 +330,22 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
         score = data.get("forge_result", {}).get("coherence_score", "")
         score_str = f"{score:.4f}" if isinstance(score, float) else str(score) or "\u2014"
         ts = data.get("run_at", data.get("forged_at", ""))
-        return (
-            f"**Dataset:** `{ds_name}`  "
-            f"**Verdict:** {verdict}  "
-            f"**Coherence:** `{score_str}`  "
-            f"**Timestamp:** {_fmt_timestamp(str(ts)) or chr(8212)}"
-        )
+        raw_mode = str(data.get("execution_mode", "unverified"))
+        mode = _MODE_LABELS.get(raw_mode, f"\u2753 {raw_mode}")
+        source_loc = data.get("source_location", "")
+        contract_ver = data.get("contract_version", "")
+        parts = [
+            f"**Dataset:** `{ds_name}`",
+            f"**Verdict:** {verdict}",
+            f"**Mode:** {mode}",
+            f"**Coherence:** `{score_str}`",
+        ]
+        if source_loc:
+            parts.append(f"**Source:** `{source_loc}`")
+        if contract_ver:
+            parts.append(f"**Contract:** `v{contract_ver}`")
+        parts.append(f"**Timestamp:** {_fmt_timestamp(str(ts)) or chr(8212)}")
+        return "  ".join(parts)
     except (json.JSONDecodeError, OSError) as exc:
         return f"_Error reading artifact: {exc}_"
 
@@ -497,9 +517,9 @@ def build_app():  # type: ignore[no-untyped-def]
                 )
                 status_table = gr.Dataframe(
                     headers=[
-                        "File", "Dataset", "Verdict", "Coherence", "Records", "Timestamp",
+                        "File", "Dataset", "Verdict", "Mode", "Coherence", "Records", "Timestamp",
                     ],
-                    column_count=6,
+                    column_count=7,
                     interactive=False, wrap=True,
                 )
 

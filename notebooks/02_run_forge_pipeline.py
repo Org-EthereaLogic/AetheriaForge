@@ -59,32 +59,51 @@ print(f"Threshold:       {contract.threshold_for_layer(target_layer)}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Prepare Demo Data
+# MAGIC ## Load Data
 # MAGIC
-# MAGIC Replace this cell with your own data loading logic.
-# MAGIC The demo creates a small synthetic dataset to prove the pipeline works.
+# MAGIC When `catalog` is set, data is read from Unity Catalog (contract-backed mode).
+# MAGIC When `catalog` is blank, a small synthetic dataset is used for demo purposes.
+# MAGIC **Demo runs are explicitly tagged in the evidence artifact and should not be
+# MAGIC treated as production results.**
 
 # COMMAND ----------
 
 import pandas as pd
 
-source_df = pd.DataFrame(
-    {
-        "id": [1, 2, 3, 4, 5],
-        "name": ["alpha", "beta", "gamma", "delta", "epsilon"],
-        "amount": [100.0, 200.0, 150.0, 300.0, 250.0],
-        "event_date": pd.to_datetime(
-            ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05"]
-        ),
-        "updated_at": pd.Timestamp.now(),
-    }
-)
+_execution_mode: str
 
-forged_df = source_df.copy()
-forged_df["amount"] = forged_df["amount"] * 1.1  # simulate a transformation
+if catalog.strip():
+    # --- Contract-backed mode: load real data from Unity Catalog ---
+    _table = f"{catalog}.{schema}.{contract.source_table}"
+    _target_table = f"{catalog}.{schema}.{contract.target_table}"
+    source_df = spark.table(_table).toPandas()  # type: ignore[name-defined]
+    forged_df = spark.table(_target_table).toPandas()  # type: ignore[name-defined]
+    _execution_mode = "contract_backed"
+    print(f"Loaded source from Unity Catalog: {_table} ({len(source_df)} rows)")
+    print(f"Loaded forged from Unity Catalog: {_target_table} ({len(forged_df)} rows)")
+else:
+    # --- Demo mode: synthetic data for smoke-testing only ---
+    print("WARNING: No catalog provided. Running in DEMO mode with synthetic data.")
+    print("Evidence artifacts from this run will be tagged execution_mode='demo'.")
+    print("These results do NOT reflect real data quality.\n")
+    source_df = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4, 5],
+            "name": ["alpha", "beta", "gamma", "delta", "epsilon"],
+            "amount": [100.0, 200.0, 150.0, 300.0, 250.0],
+            "event_date": pd.to_datetime(
+                ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05"]
+            ),
+            "updated_at": pd.Timestamp.now(),
+        }
+    )
+    forged_df = source_df.copy()
+    forged_df["amount"] = forged_df["amount"] * 1.1  # simulate a transformation
+    _execution_mode = "demo"
 
-print(f"Source rows:  {len(source_df)}")
-print(f"Forged rows:  {len(forged_df)}")
+print(f"Source rows:     {len(source_df)}")
+print(f"Forged rows:     {len(forged_df)}")
+print(f"Execution mode:  {_execution_mode}")
 
 # COMMAND ----------
 
@@ -103,6 +122,7 @@ result = pipeline.run(
     source_df=source_df,
     forged_df=forged_df,
     target_layer=target_layer,
+    execution_mode=_execution_mode,
 )
 
 # COMMAND ----------
@@ -114,6 +134,9 @@ result = pipeline.run(
 
 print(f"Dataset:          {result.dataset_name}")
 print(f"Pipeline verdict: {result.pipeline_verdict}")
+print(f"Execution mode:   {result.execution_mode}")
+print(f"Source location:  {result.source_location}")
+print(f"Contract version: {result.contract_version}")
 print(f"Run at:           {result.run_at}")
 print(f"Coherence score:  {result.forge_result.coherence_score:.6f}")
 print(f"Threshold:        {result.forge_result.threshold}")

@@ -9,3 +9,5 @@ resources:
             base_parameters:
               catalog: "${var.catalog}"
               schema: "${var.schema}"
+              contract_path: "${var.contract_path}"
+              evidence_dir: "${var.evidence_dir}"

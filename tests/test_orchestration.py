@@ -5,6 +5,7 @@ Traces: AF-SDD-001 section 4, AF-SR-008, TP-001 sections 3+4
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -12,7 +13,7 @@ import pytest
 
 from aetheriaforge.config import ForgeContract
 from aetheriaforge.evidence import EvidenceWriter
-from aetheriaforge.orchestration import ForgePipeline
+from aetheriaforge.orchestration import EXECUTION_MODES, ForgePipeline
 from aetheriaforge.resolution import (
     MatchingConfig,
     ResolutionPolicy,
@@ -189,7 +190,7 @@ def test_pipeline_evidence_written(
 
 
 def test_pipeline_result_as_dict(contract: ForgeContract) -> None:
-    """as_dict() returns a dict with event=='pipeline_result'."""
+    """as_dict() returns a dict with event=='pipeline_result' and provenance."""
     pipeline = ForgePipeline(contract)
     source = _diverse_df()
 
@@ -201,6 +202,11 @@ def test_pipeline_result_as_dict(contract: ForgeContract) -> None:
     assert "pipeline_verdict" in d
     assert "run_at" in d
     assert "forge_result" in d
+    # Provenance fields must always be present.
+    assert d["execution_mode"] == "unverified"
+    assert d["source_location"] == "c.bronze.raw"
+    assert d["target_location"] == "c.silver.forged"
+    assert d["contract_version"] == "1.0.0"
 
 
 # --- Verdict aggregation tests ------------------------------------------------
@@ -231,3 +237,85 @@ def test_pipeline_verdict_worst_of_stages(contract: ForgeContract) -> None:
     assert result.pipeline_verdict in {"WARN", "FAIL"}
     assert result.enforcement_result is not None
     assert len(result.enforcement_result.quarantined) > 0
+
+
+# --- Provenance tests ---------------------------------------------------------
+
+
+def test_pipeline_execution_mode_threading(contract: ForgeContract) -> None:
+    """execution_mode is threaded into the PipelineResult."""
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df()
+
+    result = pipeline.run(source, source.copy(), execution_mode="demo")
+
+    assert result.execution_mode == "demo"
+    assert result.as_dict()["execution_mode"] == "demo"
+
+
+def test_pipeline_contract_backed_mode(contract: ForgeContract) -> None:
+    """contract_backed execution_mode is accepted and recorded."""
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df()
+
+    result = pipeline.run(source, source.copy(), execution_mode="contract_backed")
+
+    assert result.execution_mode == "contract_backed"
+
+
+def test_pipeline_invalid_execution_mode_raises(contract: ForgeContract) -> None:
+    """Invalid execution_mode raises ValueError."""
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df()
+
+    with pytest.raises(ValueError, match="Invalid execution_mode"):
+        pipeline.run(source, source.copy(), execution_mode="production")
+
+
+def test_pipeline_default_execution_mode_is_unverified(contract: ForgeContract) -> None:
+    """Default execution_mode is 'unverified' — never silently claims contract-backed."""
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df()
+
+    result = pipeline.run(source, source.copy())
+
+    assert result.execution_mode == "unverified"
+
+
+def test_pipeline_provenance_fields_in_result(contract: ForgeContract) -> None:
+    """Provenance fields from the contract appear in the PipelineResult."""
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df()
+
+    result = pipeline.run(source, source.copy())
+
+    assert result.source_location == "c.bronze.raw"
+    assert result.target_location == "c.silver.forged"
+    assert result.contract_version == "1.0.0"
+
+
+def test_pipeline_evidence_artifact_contains_provenance(
+    contract: ForgeContract, tmp_path: Path
+) -> None:
+    """Written evidence artifact JSON contains all provenance fields."""
+    writer = EvidenceWriter(tmp_path / "evidence")
+    pipeline = ForgePipeline(contract, evidence_writer=writer)
+    source = _diverse_df()
+
+    result = pipeline.run(source, source.copy(), execution_mode="demo")
+
+    assert result.evidence_path is not None
+    artifact = json.loads(Path(result.evidence_path).read_text())
+    assert artifact["execution_mode"] == "demo"
+    assert artifact["source_location"] == "c.bronze.raw"
+    assert artifact["target_location"] == "c.silver.forged"
+    assert artifact["contract_version"] == "1.0.0"
+    assert artifact["dataset_name"] == "pipeline_ds"
+
+
+def test_execution_modes_constant() -> None:
+    """EXECUTION_MODES is a frozen set of known valid modes."""
+    assert "demo" in EXECUTION_MODES
+    assert "contract_backed" in EXECUTION_MODES
+    assert "unverified" in EXECUTION_MODES
+    assert "notebook" in EXECUTION_MODES

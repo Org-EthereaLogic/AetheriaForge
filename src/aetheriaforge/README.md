@@ -13,3 +13,4 @@ First-party ÆtheriaForge product code.
 | `evidence/` | Append-only transformation artifact writing |
 | `orchestration/` | Workflow sequencing for the forge pipeline |
 | `config/` | Forge contract and policy configuration |
+| `integration/` | Optional DriftSentinel event and drift interface (standalone by default) |

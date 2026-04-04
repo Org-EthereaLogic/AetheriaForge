@@ -32,6 +32,7 @@ class DatasetInput:
     resolution_policy: ResolutionPolicy | None = None
     temporal_config: TemporalConfig | None = None
     target_layer: str = "silver"
+    execution_mode: str = "unverified"
 
 
 @dataclass
@@ -89,6 +90,7 @@ class ForgeRunner:
             resolution_policy=dataset_input.resolution_policy,
             temporal_config=dataset_input.temporal_config,
             target_layer=dataset_input.target_layer,
+            execution_mode=dataset_input.execution_mode,
         )
 
     def run(self, inputs: dict[str, DatasetInput]) -> BatchResult:

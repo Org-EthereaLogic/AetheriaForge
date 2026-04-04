@@ -85,3 +85,13 @@ def test_forge_job_references_notebook() -> None:
     assert "02_run_forge_pipeline.py" in raw
     assert "${var.catalog}" in raw
     assert "${var.schema}" in raw
+    assert "${var.contract_path}" in raw
+    assert "${var.evidence_dir}" in raw
+
+
+def test_bundle_variables_include_contract_path_and_evidence_dir() -> None:
+    """Bundle variables must include contract_path and evidence_dir."""
+    config_path = ROOT / "databricks.yml"
+    raw = config_path.read_text(encoding="utf-8")
+    assert "contract_path:" in raw
+    assert "evidence_dir:" in raw

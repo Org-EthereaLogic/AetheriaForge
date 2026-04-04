@@ -5,6 +5,7 @@ Traces: AF-IP-004 section 3, AF-SDD-001 section 4
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -196,3 +197,48 @@ def test_batch_result_as_dict() -> None:
     assert d["batch_verdict"] == "PASS"
     assert d["dataset_count"] == 1
     assert "ds_a" in d["datasets"]
+
+
+# -- provenance ---------------------------------------------------------------
+
+
+def test_run_one_execution_mode_threading() -> None:
+    """execution_mode from DatasetInput is threaded into PipelineResult."""
+    reg = _registry_with("ds_a")
+    runner = ForgeRunner(reg)
+    df = _diverse_df()
+    inp = DatasetInput(source_df=df, forged_df=df.copy(), execution_mode="demo")
+
+    result = runner.run_one("ds_a", inp)
+
+    assert result.execution_mode == "demo"
+
+
+def test_run_one_default_execution_mode_is_unverified() -> None:
+    """DatasetInput default execution_mode is 'unverified'."""
+    reg = _registry_with("ds_a")
+    runner = ForgeRunner(reg)
+
+    result = runner.run_one("ds_a", _good_input())
+
+    assert result.execution_mode == "unverified"
+
+
+def test_batch_evidence_contains_provenance(tmp_path: Path) -> None:
+    """Batch evidence artifacts contain provenance fields."""
+    reg = _registry_with("ds_a")
+    writer = EvidenceWriter(tmp_path / "evidence")
+    runner = ForgeRunner(reg, evidence_writer=writer)
+    df = _diverse_df()
+    inp = DatasetInput(
+        source_df=df, forged_df=df.copy(), execution_mode="contract_backed",
+    )
+
+    batch = runner.run({"ds_a": inp})
+
+    path = batch.results["ds_a"].evidence_path
+    assert path is not None
+    artifact = json.loads(Path(path).read_text())
+    assert artifact["execution_mode"] == "contract_backed"
+    assert artifact["source_location"] == "c.bronze.raw"
+    assert artifact["contract_version"] == "1.0.0"
