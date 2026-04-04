@@ -1,4 +1,5 @@
-# Local app development installs the repository package from the parent dir.
--e ..
+# Databricks Apps installs from the snapshot of the bundle-uploaded source.
+# The "." reference resolves to the bundle root where pyproject.toml lives.
+.
 gradio>=6.10.0,<7
 plotly>=5.0,<6

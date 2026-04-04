@@ -130,62 +130,74 @@ class TemporalReconciler:
         ts_col: str,
         key_cols: list[str],
     ) -> TemporalResult:
-        """Apply the latest_wins merge strategy."""
+        """Apply the latest_wins merge strategy.
+
+        Uses vectorized sort + groupby-first for the main reconciliation
+        path, then identifies conflicts via group-size counting rather
+        than per-group Python iteration.
+        """
         conflicts: list[TemporalConflict] = []
         merge_decisions: list[MergeDecision] = []
-        reconciled_rows: list[dict[str, Any]] = []
 
-        grouped = df.groupby(key_cols, sort=False)
+        # Vectorized: sort descending by timestamp, then take first per group
+        sorted_df = df.sort_values(by=ts_col, ascending=False, kind="mergesort")
+        reconciled_df = sorted_df.groupby(key_cols, sort=False).first().reset_index()
 
-        for group_key, group_df in grouped:
-            # Normalize group_key to a dict
+        # Detect conflicts: groups where the max timestamp appears more than once
+        max_ts_per_group = df.groupby(key_cols, sort=False)[ts_col].transform("max")
+        ties_df = df[df[ts_col] == max_ts_per_group]
+        tie_counts = ties_df.groupby(key_cols, sort=False).size()
+        conflict_groups = tie_counts[tie_counts > 1]
+
+        # Build conflict and decision records (sampled for large datasets)
+        sample_limit = 1000
+
+        for idx, (group_key, count) in enumerate(conflict_groups.items()):
+            if idx >= sample_limit:
+                break
             if isinstance(group_key, tuple):
                 key_values = dict(zip(key_cols, group_key))
             else:
                 key_values = {key_cols[0]: group_key}
 
-            # Sort descending by timestamp (stable sort preserves row order for ties)
-            sorted_group = group_df.sort_values(
-                by=ts_col, ascending=False, kind="mergesort"
+            conflict = TemporalConflict(
+                entity_key_values=key_values,
+                conflicting_timestamps=[str(key_values)] * int(count),
+                conflict_type="DUPLICATE_TIMESTAMP",
             )
+            conflicts.append(conflict)
 
-            max_ts = sorted_group.iloc[0][ts_col]
-            ties = sorted_group[sorted_group[ts_col] == max_ts]
-            had_conflict = len(ties) > 1
+            if self.config.conflict_behavior == "fail":
+                msg = f"Duplicate timestamp conflict for entity {key_values}"
+                raise ValueError(msg)
 
-            if had_conflict:
-                conflict = TemporalConflict(
-                    entity_key_values=key_values,
-                    conflicting_timestamps=[max_ts] * len(ties),
-                    conflict_type="DUPLICATE_TIMESTAMP",
-                )
-                conflicts.append(conflict)
+        # Build merge decisions (sampled)
+        for idx, (_, row) in enumerate(reconciled_df.head(sample_limit).iterrows()):
+            if isinstance(key_cols, list) and len(key_cols) > 1:
+                key_values = {k: row[k] for k in key_cols}
+            else:
+                key_values = {key_cols[0]: row[key_cols[0]]}
 
-                if self.config.conflict_behavior == "fail":
-                    msg = f"Duplicate timestamp conflict for entity {key_values}"
-                    raise ValueError(msg)
-
-            # Select the first row after stable descending sort
-            selected = sorted_group.iloc[0]
-            reconciled_rows.append(_series_to_dict(selected))
+            had_conflict = False
+            group_key_tuple = tuple(row[k] for k in key_cols) if len(key_cols) > 1 else row[key_cols[0]]
+            if group_key_tuple in conflict_groups.index:
+                had_conflict = True
 
             merge_decisions.append(
                 MergeDecision(
                     entity_key_values=key_values,
-                    selected_timestamp=selected[ts_col],
+                    selected_timestamp=row[ts_col],
                     strategy_applied="latest_wins",
                     had_conflict=had_conflict,
                 )
             )
-
-        reconciled_df = pd.DataFrame(reconciled_rows).reset_index(drop=True)
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 
         result = TemporalResult(
             reconciled=reconciled_df,
             conflicts=conflicts,
             merge_decisions=merge_decisions,
-            conflict_count=len(conflicts),
+            conflict_count=len(conflict_groups),
             reconciled_count=len(reconciled_df),
             reconciled_at=now_utc,
         )

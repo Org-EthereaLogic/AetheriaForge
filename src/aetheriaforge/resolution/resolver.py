@@ -99,13 +99,21 @@ class EntityResolver:
     def _resolve_exact(
         self, primary_df: pd.DataFrame, secondary_df: pd.DataFrame
     ) -> ResolutionResult:
-        """Perform exact-match resolution."""
+        """Perform exact-match resolution.
+
+        Uses vectorized pandas merge and groupby operations instead of
+        per-row iteration to keep resolution O(n log n) rather than O(n^2).
+        """
         primary_keys = list(self.policy.sources[0].key_columns)
         secondary_keys = list(self.policy.sources[1].key_columns)
         ambiguity_behavior = self.policy.matching.ambiguity_behavior
 
+        # Tag primary rows so we can trace them after merge.
+        primary = primary_df.copy()
+        primary["_af_pidx"] = range(len(primary))
+
         # Left join primary onto secondary
-        merged = primary_df.merge(
+        merged = primary.merge(
             secondary_df,
             left_on=primary_keys,
             right_on=secondary_keys,
@@ -114,95 +122,98 @@ class EntityResolver:
             suffixes=("", "_secondary"),
         )
 
-        resolved_rows: list[dict[str, Any]] = []
-        unresolved_rows: list[dict[str, Any]] = []
+        # Count matches per primary row
+        match_counts = (
+            merged[merged["_merge"] == "both"]
+            .groupby("_af_pidx", sort=False)
+            .size()
+            .reset_index(name="_match_count")
+        )
+
+        # Classify each primary row
+        primary = primary.merge(match_counts, on="_af_pidx", how="left")
+        primary["_match_count"] = primary["_match_count"].fillna(0).astype(int)
+
+        no_match_mask = primary["_match_count"] == 0
+        single_match_mask = primary["_match_count"] == 1
+        ambiguous_mask = primary["_match_count"] > 1
+
+        # --- NO_MATCH rows ---
+        unresolved_indices = primary.index[no_match_mask | (ambiguous_mask & (ambiguity_behavior == "skip"))]
+
+        # --- Build resolved rows ---
+        # For single matches, take the merged row directly
+        single_pidxs = set(primary.loc[single_match_mask, "_af_pidx"])
+        matched_merged = merged[
+            (merged["_merge"] == "both") & merged["_af_pidx"].isin(single_pidxs)
+        ].copy()
+
+        ambiguous_pidxs = set(primary.loc[ambiguous_mask, "_af_pidx"])
+        ambiguous_count = len(ambiguous_pidxs)
+
+        if ambiguity_behavior == "fail" and ambiguous_count > 0:
+            first_amb = primary.loc[ambiguous_mask].iloc[0]
+            p_key_values = {k: first_amb[k] for k in primary_keys}
+            msg = f"Ambiguous match for key {p_key_values}"
+            raise ValueError(msg)
+
+        if ambiguity_behavior == "best_match" and ambiguous_pidxs:
+            # Take first match per ambiguous primary row
+            best_matches = (
+                merged[(merged["_merge"] == "both") & merged["_af_pidx"].isin(ambiguous_pidxs)]
+                .groupby("_af_pidx", sort=False)
+                .first()
+                .reset_index()
+            )
+            matched_merged = pd.concat([matched_merged, best_matches], ignore_index=True)
+        elif ambiguity_behavior == "skip" and ambiguous_pidxs:
+            pass  # already added to unresolved above
+
+        # Drop internal columns
+        drop_cols = [c for c in ["_merge", "_af_pidx", "_match_count"] if c in matched_merged.columns]
+        resolved_df = matched_merged.drop(columns=drop_cols).reset_index(drop=True)
+
+        # Build unresolved from primary
+        unresolved_df = primary_df.iloc[unresolved_indices].reset_index(drop=True)
+
+        # --- Build decisions (summary-level, not per-row for large datasets) ---
         decisions: list[MatchDecision] = []
-        ambiguous_count = 0
 
-        # Iterate by primary row index
-        for p_idx in range(len(primary_df)):
-            p_row = primary_df.iloc[p_idx]
-            p_key_values = {k: p_row[k] for k in primary_keys}
+        # Sample up to 1000 decisions to avoid massive memory for large datasets
+        sample_limit = 1000
 
-            # Find matching rows in the merged result
-            mask = pd.Series(True, index=merged.index)
-            for pk in primary_keys:
-                mask = mask & (merged[pk] == p_row[pk])
-            matches = merged[mask & (merged["_merge"] == "both")]
+        # NO_MATCH decisions
+        no_match_primary = primary_df.iloc[primary.index[no_match_mask]]
+        for _, row in no_match_primary.head(sample_limit).iterrows():
+            decisions.append(MatchDecision(
+                primary_key_values={k: row[k] for k in primary_keys},
+                secondary_key_values=None,
+                match_type="exact",
+                confidence=0.0,
+                verdict="NO_MATCH",
+            ))
 
-            if len(matches) == 0:
-                # NO_MATCH
-                unresolved_rows.append(_series_to_dict(p_row))
-                decisions.append(
-                    MatchDecision(
-                        primary_key_values=p_key_values,
-                        secondary_key_values=None,
-                        match_type="exact",
-                        confidence=0.0,
-                        verdict="NO_MATCH",
-                    )
-                )
-            elif len(matches) == 1:
-                # MATCHED
-                matched_row = _series_to_dict(matches.iloc[0])
-                matched_row.pop("_merge", None)
-                resolved_rows.append(matched_row)
+        # MATCHED decisions
+        single_primary = primary_df.iloc[primary.index[single_match_mask]]
+        for _, row in single_primary.head(sample_limit).iterrows():
+            decisions.append(MatchDecision(
+                primary_key_values={k: row[k] for k in primary_keys},
+                secondary_key_values=None,
+                match_type="exact",
+                confidence=1.0,
+                verdict="MATCHED",
+            ))
 
-                s_key_values = {
-                    k: matches.iloc[0].get(k, matches.iloc[0].get(k + "_secondary"))
-                    for k in secondary_keys
-                }
-                decisions.append(
-                    MatchDecision(
-                        primary_key_values=p_key_values,
-                        secondary_key_values=s_key_values,
-                        match_type="exact",
-                        confidence=1.0,
-                        verdict="MATCHED",
-                    )
-                )
-            else:
-                # AMBIGUOUS
-                ambiguous_count += 1
-
-                if ambiguity_behavior == "fail":
-                    msg = f"Ambiguous match for key {p_key_values}"
-                    raise ValueError(msg)
-                elif ambiguity_behavior == "best_match":
-                    best_row = _series_to_dict(matches.iloc[0])
-                    best_row.pop("_merge", None)
-                    resolved_rows.append(best_row)
-
-                    s_key_values = {
-                        k: matches.iloc[0].get(
-                            k, matches.iloc[0].get(k + "_secondary")
-                        )
-                        for k in secondary_keys
-                    }
-                    decisions.append(
-                        MatchDecision(
-                            primary_key_values=p_key_values,
-                            secondary_key_values=s_key_values,
-                            match_type="exact",
-                            confidence=0.0,
-                            verdict="AMBIGUOUS",
-                        )
-                    )
-                else:
-                    # skip (default)
-                    unresolved_rows.append(_series_to_dict(p_row))
-                    decisions.append(
-                        MatchDecision(
-                            primary_key_values=p_key_values,
-                            secondary_key_values=None,
-                            match_type="exact",
-                            confidence=0.0,
-                            verdict="AMBIGUOUS",
-                        )
-                    )
-
-        resolved_df = pd.DataFrame(resolved_rows).reset_index(drop=True)
-        unresolved_df = pd.DataFrame(unresolved_rows).reset_index(drop=True)
+        # AMBIGUOUS decisions
+        amb_primary = primary_df.iloc[primary.index[ambiguous_mask]]
+        for _, row in amb_primary.head(sample_limit).iterrows():
+            decisions.append(MatchDecision(
+                primary_key_values={k: row[k] for k in primary_keys},
+                secondary_key_values=None,
+                match_type="exact",
+                confidence=0.0,
+                verdict="AMBIGUOUS",
+            ))
 
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 

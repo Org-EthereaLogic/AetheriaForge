@@ -1,0 +1,6 @@
+# Databricks Apps runtime dependencies.
+# This file is read by the Databricks Apps deployment to install the
+# aetheriaforge package and its app dependencies into the app container.
+.
+gradio>=6.10.0,<7
+plotly>=5.0,<6

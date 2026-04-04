@@ -1,6 +1,6 @@
 command:
   - gradio
-  - app.py
+  - app/app.py
 
 env:
   - name: CONTRACTS_DIR

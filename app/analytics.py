@@ -117,7 +117,10 @@ def build_daily_volume(
     palette = _get_palette(theme)
     day_counts: Counter[str] = Counter()
     for r in records:
-        ts = r.get("run_at") or r.get("forged_at") or ""
+        ts = (
+            r.get("run_at") or r.get("forged_at") or r.get("ingested_at")
+            or r.get("resolved_at") or r.get("reconciled_at") or ""
+        )
         if not ts:
             continue
         try:

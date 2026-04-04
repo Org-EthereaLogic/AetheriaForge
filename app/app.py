@@ -255,21 +255,72 @@ def _query_evidence_records(
         if v in full_verdict_counts:
             full_verdict_counts[v] += 1
 
+    _EVENT_LABELS: dict[str, str] = {
+        "pipeline_result": "",
+        "ingest_result": "\U0001f4e5 ingest",
+        "forge_result": "\u2692\ufe0f forge",
+        "resolution_result": "\U0001f517 resolution",
+        "temporal_result": "\u23f0 temporal",
+    }
+
     rows: list[list[str]] = []
     total_results = len(results)
     truncated = total_results > 1000
     for artifact in results[:1000]:
         filename = Path(artifact.get("_evidence_path", "")).name
+        event_type = artifact.get("event", "")
         ds_name = artifact.get("dataset_name", "")
+
+        # For non-pipeline artifacts, derive dataset info from the artifact
+        if not ds_name and event_type == "ingest_result":
+            file_path = artifact.get("file_path", "")
+            if file_path:
+                ds_name = Path(file_path).stem
+        if not ds_name and event_type in ("resolution_result", "temporal_result"):
+            ds_name = _EVENT_LABELS.get(event_type, event_type)
+
         v = artifact.get("pipeline_verdict", artifact.get("verdict", ""))
         verdict_display = _VERDICT_CIRCLES.get(str(v).upper(), str(v))
+
+        # For non-pipeline artifacts, show event-type badge instead of empty verdict
+        if not v and event_type != "pipeline_result":
+            verdict_display = _EVENT_LABELS.get(event_type, str(event_type))
+
         score = artifact.get("forge_result", {}).get("coherence_score", "")
         if isinstance(score, float):
             score = f"{score:.4f}"
         records_in = artifact.get("forge_result", {}).get("records_in", "")
         records_out = artifact.get("forge_result", {}).get("records_out", "")
         record_str = f"{records_in} \u2192 {records_out}" if records_in != "" else ""
-        ts = artifact.get("run_at", artifact.get("forged_at", ""))
+
+        # For ingest results, show records_read
+        if not record_str and event_type == "ingest_result":
+            records_read = artifact.get("records_read", "")
+            if records_read:
+                record_str = f"{records_read} read"
+
+        # For resolution results, show resolved/unresolved counts
+        if not record_str and event_type == "resolution_result":
+            resolved = artifact.get("resolved_count", "")
+            unresolved = artifact.get("unresolved_count", "")
+            if resolved != "":
+                record_str = f"{resolved} resolved / {unresolved} unresolved"
+
+        # For temporal results, show reconciled count
+        if not record_str and event_type == "temporal_result":
+            reconciled = artifact.get("reconciled_count", "")
+            conflicts = artifact.get("conflict_count", "")
+            if reconciled != "":
+                record_str = f"{reconciled} reconciled / {conflicts} conflicts"
+
+        ts = (
+            artifact.get("run_at")
+            or artifact.get("forged_at")
+            or artifact.get("ingested_at")
+            or artifact.get("resolved_at")
+            or artifact.get("reconciled_at")
+            or ""
+        )
         raw_mode = str(artifact.get("execution_mode", "unverified"))
         mode_display = _MODE_LABELS.get(raw_mode, f"\u2753 {raw_mode}")
         rows.append([

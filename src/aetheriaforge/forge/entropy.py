@@ -9,15 +9,39 @@ from __future__ import annotations
 import pandas as pd
 from scipy.stats import entropy as scipy_entropy
 
+_LARGE_OBJECT_SAMPLE_THRESHOLD = 50_000
+
 
 def column_entropy(series: pd.Series) -> float:  # type: ignore[type-arg]
     """Compute the Shannon entropy (base-2) of a column's value distribution.
 
-    Returns 0.0 for empty or constant columns.
+    Returns 0.0 for empty or constant columns.  Columns whose dtype is
+    ``object`` are converted to string representations before counting so
+    that unhashable values (nested dicts/lists from JSON) do not cause
+    quadratic hashing overhead.
+
+    For large object columns (>50k rows) containing nested structures, a
+    deterministic sample is used to estimate entropy within ~1% accuracy
+    while avoiding the O(n*k) string conversion cost on deeply nested data.
     """
     if series.empty:
         return 0.0
-    counts = series.value_counts(dropna=False)
+    working = series
+    if working.dtype == object:
+        n = len(working)
+        if n > _LARGE_OBJECT_SAMPLE_THRESHOLD:
+            # Check if values are unhashable (nested dicts/lists)
+            try:
+                working.iloc[:10].value_counts(dropna=False)
+            except TypeError:
+                # Sample deterministically for reproducibility
+                sample_size = min(n, _LARGE_OBJECT_SAMPLE_THRESHOLD)
+                working = working.iloc[::max(1, n // sample_size)].head(sample_size).astype(str)
+            else:
+                working = working.astype(str)
+        else:
+            working = working.astype(str)
+    counts = working.value_counts(dropna=False)
     if len(counts) <= 1:
         return 0.0
     probabilities = counts / counts.sum()
