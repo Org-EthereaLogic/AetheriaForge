@@ -34,6 +34,7 @@ databricks = [
 dev = [
     { name = "mypy" },
     { name = "pandas-stubs" },
+    { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -59,6 +60,7 @@ databricks = [{ name = "databricks-sdk", specifier = ">=0.20" }]
 dev = [
     { name = "mypy", specifier = ">=1.10" },
     { name = "pandas-stubs", specifier = ">=2.0" },
+    { name = "pillow", specifier = ">=10.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "ruff", specifier = ">=0.4" },

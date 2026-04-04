@@ -155,3 +155,13 @@ def test_from_directory_ignores_non_yaml(tmp_path: Path) -> None:
 
     reg = DatasetRegistry.from_directory(tmp_path)
     assert len(reg) == 1
+
+
+def test_from_directory_skips_malformed_yaml(tmp_path: Path) -> None:
+    (tmp_path / "valid.yml").write_text(yaml.dump(_contract_dict("valid", "1.0.0")))
+    (tmp_path / "broken.yml").write_text("dataset: [")
+
+    reg = DatasetRegistry.from_directory(tmp_path)
+
+    assert len(reg) == 1
+    assert reg.get("valid").dataset_version == "1.0.0"

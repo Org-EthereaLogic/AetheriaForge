@@ -18,6 +18,7 @@ from app.analytics import (
 from app.app import (
     _build_summary_line,
     _fmt_timestamp,
+    _get_logo_uris,
     load_artifact_detail,
     load_artifact_meta,
     load_registry_table,
@@ -214,6 +215,21 @@ class TestBuildAnalyticsData:
         records = build_analytics_data(str(tmp_path))
         assert len(records) == 2
 
+    def test_skips_malformed_json(self, tmp_path: Path) -> None:
+        _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
+        (tmp_path / "bad.json").write_text("{not valid json")
+        records = build_analytics_data(str(tmp_path))
+        assert len(records) == 1
+
+
+class TestLogoUris:
+    def test_logo_variants_encode_as_data_uris(self) -> None:
+        light_uri, dark_uri = _get_logo_uris()
+        assert light_uri is not None
+        assert dark_uri is not None
+        assert light_uri.startswith("data:image/png;base64,")
+        assert dark_uri.startswith("data:image/png;base64,")
+
 
 # -- Chart builders ----------------------------------------------------------
 
@@ -234,7 +250,13 @@ class TestVerdictBar:
         assert hasattr(fig, "data")
 
     def test_themes(self, sample_records: list[dict]) -> None:
-        for theme in ("Brand", "Traffic Light", "Colorblind Safe"):
+        for theme in (
+            "Brand",
+            "Traffic Light",
+            "Colorblind Safe",
+            "Cyberpunk",
+            "Pastel",
+        ):
             fig = build_verdict_bar(sample_records, theme)
             assert fig is not None
 

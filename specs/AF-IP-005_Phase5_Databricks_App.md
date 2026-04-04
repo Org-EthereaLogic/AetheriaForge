@@ -86,7 +86,8 @@ Visual breakdown of transformation evidence. Charts powered by Plotly.
 
 **Controls:**
 - Evidence directory path text input
-- Color Theme dropdown (Brand, Traffic Light, Colorblind Safe)
+- Color Theme dropdown (Brand, Traffic Light, Colorblind Safe, Cyberpunk,
+  Pastel)
 - Refresh button
 
 **Charts:**

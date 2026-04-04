@@ -29,6 +29,17 @@ composition is intended to read as:
 | Mist | `#F5F7FA` | Light-mode badge background (structural) |
 | Light Grid | `#D4DCE8` | Light-mode grid and structural (structural) |
 
+## Inventory
+
+This package contains `25` generated assets across `source/`, `icons/`,
+`variants/`, `favicons/`, and `social/`, plus `README.md` and
+`generate_brand_assets.py` for `27` files total.
+
+The layout intentionally follows the same top-level buckets used by
+DriftSentinel for repo consistency, but it is not a full mirror of that
+package. Marketplace collateral is omitted until there is a direct product
+need for it.
+
 ## Directory Structure
 
 ```text
@@ -75,10 +86,11 @@ Run the generator from the repository root:
 python assets/aetheriaforge-brand-system/generate_brand_assets.py
 ```
 
-The generator writes deterministic source SVGs and the exported raster assets in
-place. It uses Pillow plus a best-effort system font lookup for the wordmark
-and social text. If no preferred font exists, it falls back to Pillow's default
-font.
+The generator deterministically rewrites the SVG sources and regenerates the
+raster assets in place when the same font environment is available. It uses
+Pillow plus a best-effort system font lookup for the wordmark and social text,
+so different host font selections can change the raster bytes. If no preferred
+font exists, it falls back to Pillow's default font.
 
 ## Usage Guide
 

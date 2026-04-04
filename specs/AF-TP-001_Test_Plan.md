@@ -56,6 +56,8 @@
 - Databricks workspace validation for both deployment paths
 - Configuration tests for forge contract registration and policy loading
 - Notebook import path operates without bundle
+- Operator dashboard regression coverage verifies logo-asset availability,
+  analytics theme options, and brand asset manifest integrity
 
 ## 8. Exit Criteria
 

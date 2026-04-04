@@ -12,6 +12,13 @@ Databricks App UI (Gradio) — read-only operator dashboard for ÆtheriaForge.
 | `requirements.txt` | App-specific Python dependencies |
 | `__init__.py` | Package marker |
 
+## Branding
+
+- Header logos are read from `assets/aetheriaforge-brand-system/variants/`
+  when present and fall back to a text-only header otherwise.
+- Analytics exposes five color themes: `Brand`, `Traffic Light`,
+  `Colorblind Safe`, `Cyberpunk`, and `Pastel`.
+
 ## Tabs
 
 1. **Forge Registry** — browse registered datasets and contract configuration

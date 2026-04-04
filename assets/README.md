@@ -2,9 +2,9 @@
 
 Repository-managed brand and collateral assets.
 
-This surface is additive project collateral, not a claim that the Databricks
-App UI now ships production branding or custom styling. Keep source artwork and
-regeneration scripts here so brand files remain auditable and reproducible.
+This surface keeps source artwork and regeneration scripts auditable. Asset
+presence alone is not proof of deployed UI behavior, but the Databricks App
+currently reads logo variants from this surface when those files are present.
 
 ## Contents
 
