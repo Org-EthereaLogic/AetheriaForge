@@ -1,0 +1,38 @@
+---
+# Scope hosted Codacy analysis to product-relevant runtime and deployable
+# surfaces. SDLC specs, governance docs, prompts, evidence artifacts, and
+# generated/non-runtime assets are verified through dedicated repo checks and
+# otherwise dominate the grade with low-signal findings.
+exclude_paths:
+  - ".claude/**"
+  - ".codacy/**"
+  - ".github/instructions/**"
+  - ".github/prompts/**"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "CONSTITUTION.md"
+  - "CONTRIBUTING.md"
+  - "DIRECTIVES.md"
+  - "README.md"
+  - "SECURITY.md"
+  - "adws/**"
+  - "assets/**"
+  - "docs/**"
+  - "notebooks/**"
+  - "report/**"
+  - "specs/**"
+  - "uv.lock"
+
+engines:
+  bandit:
+    exclude_paths:
+      - "tests/**"
+  opengrep:
+    exclude_paths:
+      - "tests/**"
+  prospector:
+    exclude_paths:
+      - "tests/**"
+  pylintpython3:
+    exclude_paths:
+      - "tests/**"
