@@ -16,7 +16,7 @@ def _normalize_path_text(value: str | Path) -> str:
     text = os.fspath(value).strip()
     if not text:
         raise PathSecurityError("Configured directory is empty.")
-    return os.path.abspath(os.path.expanduser(text))
+    return os.path.realpath(os.path.expanduser(text))
 
 
 def enforce_configured_dir(
