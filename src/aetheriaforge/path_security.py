@@ -32,7 +32,7 @@ def enforce_configured_dir(
         requested_norm = _normalize_path_text(requested)
         if requested_norm != configured_norm:
             raise PathSecurityError(
-                f"{context} must match the configured directory: {configured_norm}"
+                f"{context} must match the configured directory."
             )
     return Path(configured_norm)
 
