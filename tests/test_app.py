@@ -120,7 +120,7 @@ class TestLoadRegistryTable:
     ) -> None:
         missing = tmp_path / "contracts"
         monkeypatch.setattr(app_module, "CONTRACTS_DIR", str(missing))
-        rows = load_registry_table(str(missing))
+        rows = app_module.load_registry_table(str(missing))
         assert "no contracts directory" in rows[0][0]
 
     def test_empty_directory(
