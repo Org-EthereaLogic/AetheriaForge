@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   id-token: write  # Required for PyPI trusted publishing (OIDC)
+  artifact-metadata: write
 
 jobs:
   publish:
@@ -33,3 +34,70 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+
+      - name: Upload PyPI storage records to GitHub linked artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_NAME: etherealogic-aetheriaforge
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import time
+          import tomllib
+          import urllib.request
+
+          root = pathlib.Path(".")
+          pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+          version = pyproject["project"]["version"]
+          package_name = os.environ["PACKAGE_NAME"]
+          dist_dir = root / "dist"
+          dist_files = sorted(path for path in dist_dir.iterdir() if path.is_file())
+          if not dist_files:
+              raise SystemExit("No built distributions found in dist/.")
+          output_dir = root / ".linked-artifacts"
+          output_dir.mkdir(exist_ok=True)
+
+          metadata = None
+          missing = []
+          for _ in range(10):
+              with urllib.request.urlopen(
+                  f"https://pypi.org/pypi/{package_name}/{version}/json"
+              ) as response:
+                  metadata = json.load(response)
+              available = {entry["filename"]: entry for entry in metadata["urls"]}
+              missing = [path.name for path in dist_files if path.name not in available]
+              if not missing:
+                  break
+              time.sleep(5)
+
+          if missing:
+              raise SystemExit(
+                  f"PyPI metadata did not list uploaded files for version {version}: {missing}"
+              )
+
+          for path in dist_files:
+              file_info = available[path.name]
+              payload = {
+                  "name": package_name,
+                  "version": version,
+                  "digest": f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}",
+                  "registry_url": "https://pypi.org",
+                  "repository": package_name,
+                  "artifact_url": file_info["url"],
+                  "github_repository": os.environ["GITHUB_REPOSITORY"],
+              }
+              target = output_dir / f"{path.name}.json"
+              target.write_text(json.dumps(payload), encoding="utf-8")
+              print(target)
+          PY
+
+          while IFS= read -r payload; do
+            gh api \
+              --method POST \
+              "orgs/${GITHUB_REPOSITORY_OWNER}/artifacts/metadata/storage-record" \
+              --input "$payload"
+          done < <(find .linked-artifacts -type f -name '*.json' | sort)
+          rm -rf .linked-artifacts

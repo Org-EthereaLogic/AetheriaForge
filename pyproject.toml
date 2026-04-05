@@ -7,16 +7,29 @@ name = "etherealogic-aetheriaforge"
 version = "0.1.0"
 description = "EthereaLogic Databricks Suite — Intelligent Data Transformation Engine"
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [
     { name = "Anthony Johnson" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.0",
     "scipy>=1.11",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Org-EthereaLogic/AetheriaForge"
+Repository = "https://github.com/Org-EthereaLogic/AetheriaForge"
+PyPI = "https://pypi.org/project/etherealogic-aetheriaforge/"
+Issues = "https://github.com/Org-EthereaLogic/AetheriaForge/issues"
+Documentation = "https://github.com/Org-EthereaLogic/AetheriaForge#readme"
 
 [dependency-groups]
 app = [
