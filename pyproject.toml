@@ -18,6 +18,12 @@ dependencies = [
     "scipy>=1.11",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Org-EthereaLogic/AetheriaForge"
+Repository = "https://github.com/Org-EthereaLogic/AetheriaForge"
+PyPI = "https://pypi.org/project/etherealogic-aetheriaforge/"
+Documentation = "https://github.com/Org-EthereaLogic/AetheriaForge#readme"
+
 [dependency-groups]
 app = [
     "gradio>=6.10.0,<7",
