@@ -52,7 +52,7 @@ jobs:
           root = pathlib.Path(".")
           pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
           version = pyproject["project"]["version"]
-          package_name = os.environ["PACKAGE_NAME"]
+          package_name = pyproject["project"]["name"]
           dist_dir = root / "dist"
           dist_files = sorted(path for path in dist_dir.iterdir() if path.is_file())
           if not dist_files:
