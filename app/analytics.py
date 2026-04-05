@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import plotly.graph_objects as go
 
 from aetheriaforge.evidence.history import TransformationHistory
+from aetheriaforge.path_security import PathSecurityError, enforce_configured_dir
+
+DEFAULT_EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", "/tmp/aetheriaforge_evidence")
 
 # -- Color palettes ----------------------------------------------------------
 
@@ -51,7 +54,14 @@ def _get_palette(theme: str) -> dict[str, str]:
 
 def build_analytics_data(evidence_dir: str) -> list[dict[str, Any]]:
     """Load all evidence records through the shared history reader."""
-    path = Path(evidence_dir)
+    try:
+        path = enforce_configured_dir(
+            evidence_dir,
+            configured_dir=DEFAULT_EVIDENCE_DIR,
+            context="Evidence directory",
+        )
+    except PathSecurityError:
+        return []
     if not path.is_dir():
         return []
     return TransformationHistory(path).list_all()
