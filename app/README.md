@@ -37,5 +37,5 @@ gradio app/app.py
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CONTRACTS_DIR` | `/tmp/aetheriaforge_contracts` | Directory containing YAML forge contracts |
-| `EVIDENCE_DIR` | `/tmp/aetheriaforge_evidence` | Directory containing evidence JSON artifacts |
+| `CONTRACTS_DIR` | `~/.aetheriaforge/contracts` | Directory containing YAML forge contracts |
+| `EVIDENCE_DIR` | `~/.aetheriaforge/evidence` | Directory containing evidence JSON artifacts |

@@ -11,8 +11,9 @@ import plotly.graph_objects as go
 
 from aetheriaforge.evidence.history import TransformationHistory
 from aetheriaforge.path_security import PathSecurityError, enforce_configured_dir
+from aetheriaforge.runtime_paths import default_evidence_dir
 
-DEFAULT_EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", "/tmp/aetheriaforge_evidence")
+DEFAULT_EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", str(default_evidence_dir()))
 
 # -- Color palettes ----------------------------------------------------------
 

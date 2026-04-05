@@ -30,9 +30,10 @@ from aetheriaforge.path_security import (
     enforce_configured_dir,
     resolve_configured_child,
 )
+from aetheriaforge.runtime_paths import default_contracts_dir, default_evidence_dir
 
-CONTRACTS_DIR = os.environ.get("CONTRACTS_DIR", "/tmp/aetheriaforge_contracts")
-EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", "/tmp/aetheriaforge_evidence")
+CONTRACTS_DIR = os.environ.get("CONTRACTS_DIR", str(default_contracts_dir()))
+EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", str(default_evidence_dir()))
 
 # -- Brand palette (AetheriaForge) -------------------------------------------
 

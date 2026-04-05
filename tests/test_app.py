@@ -8,14 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+import app.analytics as analytics_module
 import app.app as app_module
-from app.analytics import (
-    build_analytics_data,
-    build_coherence_histogram,
-    build_coherence_trend,
-    build_daily_volume,
-    build_verdict_bar,
-)
 
 # -- Fixtures ----------------------------------------------------------------
 
@@ -85,17 +79,17 @@ class TestFmtTimestamp:
 
 class TestBuildSummaryLine:
     def test_empty_rows(self) -> None:
-        assert _build_summary_line([]) == ""
+        assert app_module._build_summary_line([]) == ""
 
     def test_no_artifacts_row(self) -> None:
-        assert _build_summary_line([["(no artifacts found)", "", "", "", "", ""]]) == ""
+        assert app_module._build_summary_line([["(no artifacts found)", "", "", "", "", ""]]) == ""
 
     def test_valid_rows(self) -> None:
         rows = [
             ["f1.json", "ds_a", "\U0001f7e2 PASS", "\u2705 contract_backed", "0.85", "100 \u2192 95", "Apr 03"],
             ["f2.json", "ds_b", "\U0001f534 FAIL", "\u2753 unverified", "0.50", "100 \u2192 90", "Apr 03"],
         ]
-        result = _build_summary_line(rows)
+        result = app_module._build_summary_line(rows)
         assert "2 artifacts" in result
         assert "PASS: 1" in result
         assert "FAIL: 1" in result
@@ -106,7 +100,7 @@ class TestBuildSummaryLine:
             ["f2.json", "ds_b", "\U0001f534 FAIL", "\u2753 unverified", "0.50", "100 \u2192 90", "Apr 03"],
             ["(Truncated from 1008 to latest 1000 records)", "...", "...", "...", "...", "...", "..."],
         ]
-        result = _build_summary_line_with_total(rows, total_records=1008)
+        result = app_module._build_summary_line_with_total(rows, total_records=1008)
         assert "1008 artifacts" in result
         assert "other:" not in result
 
@@ -127,7 +121,7 @@ class TestLoadRegistryTable:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(app_module, "CONTRACTS_DIR", str(tmp_path))
-        rows = load_registry_table(str(tmp_path))
+        rows = app_module.load_registry_table(str(tmp_path))
         assert "no datasets" in rows[0][0]
 
     def test_valid_contracts(
@@ -136,7 +130,7 @@ class TestLoadRegistryTable:
         monkeypatch.setattr(app_module, "CONTRACTS_DIR", str(tmp_path))
         _make_contract_yaml(tmp_path, "orders")
         _make_contract_yaml(tmp_path, "customers")
-        rows = load_registry_table(str(tmp_path))
+        rows = app_module.load_registry_table(str(tmp_path))
         assert len(rows) == 2
         names = {row[0] for row in rows}
         assert names == {"orders", "customers"}
@@ -148,7 +142,7 @@ class TestLoadRegistryTable:
         _make_contract_yaml(tmp_path, "orders", "1.0.0")
         _make_contract_yaml(tmp_path, "orders_v2", "2.0.0")
         # We use different names because same-name contracts need different YAML
-        rows = load_registry_table(str(tmp_path))
+        rows = app_module.load_registry_table(str(tmp_path))
         assert len(rows) == 2
 
     def test_rejects_untrusted_directory(
@@ -159,7 +153,7 @@ class TestLoadRegistryTable:
         trusted.mkdir()
         untrusted.mkdir()
         monkeypatch.setattr(app_module, "CONTRACTS_DIR", str(trusted))
-        rows = load_registry_table(str(untrusted))
+        rows = app_module.load_registry_table(str(untrusted))
         assert "must match the configured directory" in rows[0][0]
 
 
@@ -172,14 +166,14 @@ class TestQueryEvidence:
     ) -> None:
         missing = tmp_path / "evidence"
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(missing))
-        rows = query_evidence(str(missing), "", "", "", "")
+        rows = app_module.query_evidence(str(missing), "", "", "", "")
         assert "no artifacts" in rows[0][0]
 
     def test_empty_directory(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
-        rows = query_evidence(str(tmp_path), "", "", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "", "", "", "")
         assert "no artifacts" in rows[0][0]
 
     def test_returns_artifacts(
@@ -188,7 +182,7 @@ class TestQueryEvidence:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
         _make_evidence_json(tmp_path, "customers", "FAIL", 0.50)
-        rows = query_evidence(str(tmp_path), "", "", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "", "", "", "")
         assert len(rows) == 2
 
     def test_filter_by_dataset(
@@ -197,7 +191,7 @@ class TestQueryEvidence:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
         _make_evidence_json(tmp_path, "customers", "FAIL", 0.50)
-        rows = query_evidence(str(tmp_path), "orders", "", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "orders", "", "", "")
         assert len(rows) == 1
         assert rows[0][1] == "orders"
 
@@ -207,7 +201,7 @@ class TestQueryEvidence:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
         _make_evidence_json(tmp_path, "customers", "FAIL", 0.50)
-        rows = query_evidence(str(tmp_path), "", "FAIL", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "", "FAIL", "", "")
         assert len(rows) == 1
         assert "FAIL" in rows[0][2]
 
@@ -216,7 +210,7 @@ class TestQueryEvidence:
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
-        rows = query_evidence(str(tmp_path), "", "", "2026-04-03", "2026-04-03")
+        rows = app_module.query_evidence(str(tmp_path), "", "", "2026-04-03", "2026-04-03")
         assert len(rows) == 1
         assert rows[0][1] == "orders"
 
@@ -225,7 +219,7 @@ class TestQueryEvidence:
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85, execution_mode="demo")
-        rows = query_evidence(str(tmp_path), "", "", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "", "", "", "")
         assert len(rows) == 1
         # Mode is column index 3
         assert "demo" in rows[0][3]
@@ -235,7 +229,7 @@ class TestQueryEvidence:
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85, execution_mode="contract_backed")
-        rows = query_evidence(str(tmp_path), "", "", "", "")
+        rows = app_module.query_evidence(str(tmp_path), "", "", "", "")
         assert "contract_backed" in rows[0][3]
 
     def test_rejects_untrusted_directory(
@@ -246,7 +240,7 @@ class TestQueryEvidence:
         trusted.mkdir()
         untrusted.mkdir()
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(trusted))
-        rows = query_evidence(str(untrusted), "", "", "", "")
+        rows = app_module.query_evidence(str(untrusted), "", "", "", "")
         assert "must match the configured directory" in rows[0][0]
 
 
@@ -255,14 +249,14 @@ class TestQueryEvidence:
 
 class TestLoadArtifactDetail:
     def test_empty_filename(self) -> None:
-        result = load_artifact_detail("/tmp", "")
+        result = app_module.load_artifact_detail("/tmp", "")
         assert "select an artifact" in result
 
     def test_missing_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
-        result = load_artifact_detail(str(tmp_path), "nonexistent.json")
+        result = app_module.load_artifact_detail(str(tmp_path), "nonexistent.json")
         assert "file not found" in result
 
     def test_valid_file(
@@ -270,7 +264,7 @@ class TestLoadArtifactDetail:
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         fp = _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
-        result = load_artifact_detail(str(tmp_path), fp.name)
+        result = app_module.load_artifact_detail(str(tmp_path), fp.name)
         parsed = json.loads(result)
         assert parsed["dataset_name"] == "orders"
 
@@ -278,8 +272,15 @@ class TestLoadArtifactDetail:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
-        result = load_artifact_detail(str(tmp_path), "../secret.json")
+        result = app_module.load_artifact_detail(str(tmp_path), "../secret.json")
         assert "bare filename" in result
+
+    def test_rejects_non_json_artifact_filename(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
+        result = app_module.load_artifact_detail(str(tmp_path), "artifact.txt")
+        assert "must use one of: .json" in result
 
 
 # -- load_artifact_meta ------------------------------------------------------
@@ -287,14 +288,14 @@ class TestLoadArtifactDetail:
 
 class TestLoadArtifactMeta:
     def test_empty_filename(self) -> None:
-        result = load_artifact_meta("/tmp", "")
+        result = app_module.load_artifact_meta("/tmp", "")
         assert "Enter an artifact" in result
 
     def test_missing_file(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
-        result = load_artifact_meta(str(tmp_path), "nonexistent.json")
+        result = app_module.load_artifact_meta(str(tmp_path), "nonexistent.json")
         assert "not found" in result
 
     def test_valid_file(
@@ -302,7 +303,7 @@ class TestLoadArtifactMeta:
     ) -> None:
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
         fp = _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
-        result = load_artifact_meta(str(tmp_path), fp.name)
+        result = app_module.load_artifact_meta(str(tmp_path), fp.name)
         assert "orders" in result
         assert "PASS" in result
         assert "0.85" in result
@@ -319,7 +320,7 @@ class TestLoadArtifactMeta:
         trusted.mkdir()
         untrusted.mkdir()
         monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(trusted))
-        result = load_artifact_meta(str(untrusted), "artifact.json")
+        result = app_module.load_artifact_meta(str(untrusted), "artifact.json")
         assert "configured directory" in result
 
 
@@ -332,13 +333,13 @@ class TestBuildAnalyticsData:
     ) -> None:
         missing = tmp_path / "evidence"
         monkeypatch.setattr(analytics_module, "DEFAULT_EVIDENCE_DIR", str(missing))
-        assert build_analytics_data(str(missing)) == []
+        assert analytics_module.build_analytics_data(str(missing)) == []
 
     def test_empty_directory(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(analytics_module, "DEFAULT_EVIDENCE_DIR", str(tmp_path))
-        assert build_analytics_data(str(tmp_path)) == []
+        assert analytics_module.build_analytics_data(str(tmp_path)) == []
 
     def test_loads_records(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -346,7 +347,7 @@ class TestBuildAnalyticsData:
         monkeypatch.setattr(analytics_module, "DEFAULT_EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
         _make_evidence_json(tmp_path, "customers", "FAIL", 0.50)
-        records = build_analytics_data(str(tmp_path))
+        records = analytics_module.build_analytics_data(str(tmp_path))
         assert len(records) == 2
 
     def test_skips_malformed_json(
@@ -355,7 +356,7 @@ class TestBuildAnalyticsData:
         monkeypatch.setattr(analytics_module, "DEFAULT_EVIDENCE_DIR", str(tmp_path))
         _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
         (tmp_path / "bad.json").write_text("{not valid json")
-        records = build_analytics_data(str(tmp_path))
+        records = analytics_module.build_analytics_data(str(tmp_path))
         assert len(records) == 1
 
     def test_rejects_untrusted_directory(
@@ -366,12 +367,12 @@ class TestBuildAnalyticsData:
         trusted.mkdir()
         untrusted.mkdir()
         monkeypatch.setattr(analytics_module, "DEFAULT_EVIDENCE_DIR", str(trusted))
-        assert build_analytics_data(str(untrusted)) == []
+        assert analytics_module.build_analytics_data(str(untrusted)) == []
 
 
 class TestLogoUris:
     def test_logo_variants_encode_as_data_uris(self) -> None:
-        light_uri, dark_uri = _get_logo_uris()
+        light_uri, dark_uri = app_module._get_logo_uris()
         assert light_uri is not None
         assert dark_uri is not None
         assert light_uri.startswith("data:image/png;base64,")
@@ -390,12 +391,12 @@ def sample_records(
     _make_evidence_json(tmp_path, "orders", "PASS", 0.85)
     _make_evidence_json(tmp_path, "customers", "FAIL", 0.50)
     _make_evidence_json(tmp_path, "products", "WARN", 0.72)
-    return build_analytics_data(str(tmp_path))
+    return analytics_module.build_analytics_data(str(tmp_path))
 
 
 class TestVerdictBar:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
-        fig = build_verdict_bar(sample_records)
+        fig = analytics_module.build_verdict_bar(sample_records)
         assert fig is not None
         assert hasattr(fig, "data")
 
@@ -407,29 +408,29 @@ class TestVerdictBar:
             "Cyberpunk",
             "Pastel",
         ):
-            fig = build_verdict_bar(sample_records, theme)
+            fig = analytics_module.build_verdict_bar(sample_records, theme)
             assert fig is not None
 
 
 class TestCoherenceHistogram:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
-        fig = build_coherence_histogram(sample_records)
+        fig = analytics_module.build_coherence_histogram(sample_records)
         assert fig is not None
 
 
 class TestDailyVolume:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
-        fig = build_daily_volume(sample_records)
+        fig = analytics_module.build_daily_volume(sample_records)
         assert fig is not None
         assert fig.layout.xaxis.type == "category"
 
 
 class TestCoherenceTrend:
     def test_returns_figure(self, sample_records: list[dict]) -> None:
-        fig = build_coherence_trend(sample_records)
+        fig = analytics_module.build_coherence_trend(sample_records)
         assert fig is not None
         assert fig.layout.xaxis.type == "category"
 
     def test_empty_records(self) -> None:
-        fig = build_coherence_trend([])
+        fig = analytics_module.build_coherence_trend([])
         assert fig is not None
