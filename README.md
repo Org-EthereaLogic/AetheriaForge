@@ -12,6 +12,7 @@ Built by Anthony Johnson | EthereaLogic LLC
 
 <p align="left">
   <a href="https://github.com/Org-EthereaLogic/AetheriaForge/actions/workflows/ci.yml"><img src="https://github.com/Org-EthereaLogic/AetheriaForge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/etherealogic-aetheriaforge/"><img src="https://img.shields.io/pypi/v/etherealogic-aetheriaforge" alt="PyPI version"></a>
   <a href="https://app.codacy.com/gh/Org-EthereaLogic/AetheriaForge/dashboard"><img src="https://img.shields.io/badge/codacy-dashboard-blue" alt="Codacy dashboard"></a>
   <a href="https://codecov.io/gh/Org-EthereaLogic/AetheriaForge"><img src="https://codecov.io/gh/Org-EthereaLogic/AetheriaForge/graph/badge.svg" alt="Codecov coverage"></a>
 </p>
