@@ -28,7 +28,7 @@ from aetheriaforge.evidence.history import TransformationHistory
 from aetheriaforge.path_security import (
     PathSecurityError,
     enforce_configured_dir,
-    resolve_configured_child,
+    validate_simple_filename,
 )
 from aetheriaforge.runtime_paths import default_contracts_dir, default_evidence_dir
 
@@ -366,16 +366,10 @@ def load_artifact_detail(evidence_dir: str, filename: str) -> str:
     if not fname:
         return "(select an artifact filename)"
     try:
-        path = resolve_configured_child(
-            evidence_dir,
-            fname,
-            configured_dir=EVIDENCE_DIR,
-            context="Artifact filename",
-            allowed_suffixes={".json"},
-        )
+        path = _resolve_existing_artifact_file(evidence_dir, fname)
     except PathSecurityError as exc:
         return f"(invalid filename: {exc})"
-    if not path.is_file():
+    except FileNotFoundError:
         return f"(file not found: {fname})"
     try:
         data = json.loads(path.read_text())
@@ -390,16 +384,10 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
     if not fname:
         return "_Enter an artifact filename above and click Load Artifact._"
     try:
-        path = resolve_configured_child(
-            evidence_dir,
-            fname,
-            configured_dir=EVIDENCE_DIR,
-            context="Artifact filename",
-            allowed_suffixes={".json"},
-        )
+        path = _resolve_existing_artifact_file(evidence_dir, fname)
     except PathSecurityError as exc:
         return f"_Invalid filename: {exc}_"
-    if not path.is_file():
+    except FileNotFoundError:
         return f"_File not found: `{fname}`_"
     try:
         data = json.loads(path.read_text())
@@ -429,6 +417,28 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
         return "  ".join(parts)
     except (json.JSONDecodeError, OSError) as exc:
         return f"_Error reading artifact: {exc}_"
+
+
+def _resolve_existing_artifact_file(evidence_dir: str, filename: str) -> Path:
+    """Resolve an artifact by exact filename from the configured evidence directory."""
+    root = enforce_configured_dir(
+        evidence_dir,
+        configured_dir=EVIDENCE_DIR,
+        context="Evidence directory",
+    )
+    name = validate_simple_filename(
+        filename,
+        context="Artifact filename",
+        allowed_suffixes={".json"},
+    )
+    if not root.is_dir():
+        raise FileNotFoundError(name)
+
+    for candidate in root.iterdir():
+        if candidate.is_file() and candidate.suffix.lower() == ".json" and candidate.name == name:
+            return candidate
+
+    raise FileNotFoundError(name)
 
 
 # -- Theme -------------------------------------------------------------------

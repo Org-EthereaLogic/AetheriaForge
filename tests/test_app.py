@@ -282,6 +282,19 @@ class TestLoadArtifactDetail:
         result = app_module.load_artifact_detail(str(tmp_path), "artifact.txt")
         assert "must use one of: .json" in result
 
+    def test_does_not_load_nested_artifact_by_name(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        _make_evidence_json(nested, "orders", "PASS", 0.85)
+        monkeypatch.setattr(app_module, "EVIDENCE_DIR", str(tmp_path))
+        result = app_module.load_artifact_detail(
+            str(tmp_path),
+            "forge-evidence-20260403T140000_orders.json",
+        )
+        assert "file not found" in result
+
 
 # -- load_artifact_meta ------------------------------------------------------
 
