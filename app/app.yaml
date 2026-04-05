@@ -4,6 +4,6 @@ command:
 
 env:
   - name: CONTRACTS_DIR
-    value: /tmp/aetheriaforge_contracts
+    value: /Volumes/adb_dev/default/aetheriaforge_runtime/contracts
   - name: EVIDENCE_DIR
-    value: /tmp/aetheriaforge_evidence
+    value: /Volumes/adb_dev/default/aetheriaforge_runtime/evidence
