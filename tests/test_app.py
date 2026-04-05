@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-import app.analytics as analytics_module
 import app.app as app_module
 from app.analytics import (
     build_analytics_data,
