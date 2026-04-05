@@ -182,3 +182,19 @@ def test_from_directory_summarizes_malformed_warnings(
     assert len(warnings) == 1
     assert "Skipped 2 malformed contract file(s)" in warnings[0]
     assert "broken_1.yml" in warnings[0]
+
+
+def test_from_directory_sanitizes_log_values(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    malicious_dir = tmp_path / "contracts\nforged"
+    malicious_dir.mkdir()
+    (malicious_dir / "broken.yml").write_text("dataset: [")
+
+    with caplog.at_level("WARNING"):
+        DatasetRegistry.from_directory(malicious_dir)
+
+    assert len(caplog.records) == 1
+    message = caplog.records[0].message
+    assert "contracts\\nforged" in message
+    assert "contracts\nforged" not in message

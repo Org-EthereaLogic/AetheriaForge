@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from aetheriaforge.config.contract import ForgeContract
+from aetheriaforge.path_security import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -121,14 +122,15 @@ class DatasetRegistry:
                     malformed.append((yaml_path.name, str(exc)))
         if malformed:
             preview = ", ".join(
-                f"{name}: {detail}" for name, detail in malformed[:3]
+                f"{sanitize_log_value(name)}: {sanitize_log_value(detail)}"
+                for name, detail in malformed[:3]
             )
             if len(malformed) > 3:
                 preview = f"{preview}, ..."
             logger.warning(
                 "Skipped %d malformed contract file(s) in %s. Examples: %s",
                 len(malformed),
-                path,
+                sanitize_log_value(path),
                 preview,
             )
         return registry

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+DEFAULT_LOCAL_APP_DIRNAME = ".aetheriaforge"
 DEFAULT_RUNTIME_VOLUME = "aetheriaforge_runtime"
 
 
@@ -43,3 +44,18 @@ def shared_evidence_dir(
 ) -> Path:
     """Return the shared evidence directory."""
     return shared_runtime_root(catalog, schema, volume) / "evidence"
+
+
+def local_app_root(home: Path | None = None) -> Path:
+    """Return the per-user local root for app-facing contracts and evidence."""
+    return (home or Path.home()) / DEFAULT_LOCAL_APP_DIRNAME
+
+
+def default_contracts_dir(home: Path | None = None) -> Path:
+    """Return the default local contracts directory."""
+    return local_app_root(home) / "contracts"
+
+
+def default_evidence_dir(home: Path | None = None) -> Path:
+    """Return the default local evidence directory."""
+    return local_app_root(home) / "evidence"

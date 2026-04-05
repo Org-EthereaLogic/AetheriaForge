@@ -25,9 +25,15 @@ except ImportError:  # allow test imports without gradio installed
 
 from aetheriaforge.config.registry import DatasetRegistry
 from aetheriaforge.evidence.history import TransformationHistory
+from aetheriaforge.path_security import (
+    PathSecurityError,
+    enforce_configured_dir,
+    resolve_configured_child,
+)
+from aetheriaforge.runtime_paths import default_contracts_dir, default_evidence_dir
 
-CONTRACTS_DIR = os.environ.get("CONTRACTS_DIR", "/tmp/aetheriaforge_contracts")
-EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", "/tmp/aetheriaforge_evidence")
+CONTRACTS_DIR = os.environ.get("CONTRACTS_DIR", str(default_contracts_dir()))
+EVIDENCE_DIR = os.environ.get("EVIDENCE_DIR", str(default_evidence_dir()))
 
 # -- Brand palette (AetheriaForge) -------------------------------------------
 
@@ -129,8 +135,14 @@ def _build_summary_line_with_total(
 
 def load_registry_table(contracts_dir: str) -> list[list[str]]:
     """Load all forge contracts from a directory into table rows."""
-    cdir = contracts_dir.strip() or CONTRACTS_DIR
-    path = Path(cdir)
+    try:
+        path = enforce_configured_dir(
+            contracts_dir,
+            configured_dir=CONTRACTS_DIR,
+            context="Contracts directory",
+        )
+    except PathSecurityError as exc:
+        return [[f"(error: {exc})", "", "", "", "", ""]]
     if not path.is_dir():
         return [["(no contracts directory found)", "", "", "", "", ""]]
     try:
@@ -227,8 +239,16 @@ def _query_evidence_records(
     date_to: str,
 ) -> tuple[list[list[str]], int, dict[str, int]]:
     """Query evidence and return rows, total count, and full verdict counts."""
-    edir = evidence_dir.strip() or EVIDENCE_DIR
-    history = TransformationHistory(Path(edir))
+    try:
+        history = TransformationHistory(
+            enforce_configured_dir(
+                evidence_dir,
+                configured_dir=EVIDENCE_DIR,
+                context="Evidence directory",
+            )
+        )
+    except PathSecurityError as exc:
+        return [[f"(error: {exc})", "", "", "", "", "", ""]], 0, {}
 
     after = _parse_filter_datetime(date_from, is_end=False)
     before = _parse_filter_datetime(date_to, is_end=True)
@@ -345,11 +365,16 @@ def load_artifact_detail(evidence_dir: str, filename: str) -> str:
     fname = filename.strip()
     if not fname:
         return "(select an artifact filename)"
-    edir = evidence_dir.strip() or EVIDENCE_DIR
-    base = Path(edir).resolve()
-    path = (base / fname).resolve()
-    if not path.is_relative_to(base):
-        return "(invalid filename: path traversal rejected)"
+    try:
+        path = resolve_configured_child(
+            evidence_dir,
+            fname,
+            configured_dir=EVIDENCE_DIR,
+            context="Artifact filename",
+            allowed_suffixes={".json"},
+        )
+    except PathSecurityError as exc:
+        return f"(invalid filename: {exc})"
     if not path.is_file():
         return f"(file not found: {fname})"
     try:
@@ -364,11 +389,16 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
     fname = filename.strip()
     if not fname:
         return "_Enter an artifact filename above and click Load Artifact._"
-    edir = evidence_dir.strip() or EVIDENCE_DIR
-    base = Path(edir).resolve()
-    path = (base / fname).resolve()
-    if not path.is_relative_to(base):
-        return "_Invalid filename: path traversal rejected_"
+    try:
+        path = resolve_configured_child(
+            evidence_dir,
+            fname,
+            configured_dir=EVIDENCE_DIR,
+            context="Artifact filename",
+            allowed_suffixes={".json"},
+        )
+    except PathSecurityError as exc:
+        return f"_Invalid filename: {exc}_"
     if not path.is_file():
         return f"_File not found: `{fname}`_"
     try:
