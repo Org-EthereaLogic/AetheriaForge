@@ -17,16 +17,6 @@ from app.analytics import (
     build_daily_volume,
     build_verdict_bar,
 )
-from app.app import (
-    _build_summary_line,
-    _build_summary_line_with_total,
-    _fmt_timestamp,
-    _get_logo_uris,
-    load_artifact_detail,
-    load_artifact_meta,
-    load_registry_table,
-    query_evidence,
-)
 
 # -- Fixtures ----------------------------------------------------------------
 
@@ -82,13 +72,13 @@ def _make_evidence_json(
 
 class TestFmtTimestamp:
     def test_valid_iso(self) -> None:
-        assert "Apr 03" in _fmt_timestamp("2026-04-03T14:00:00+00:00")
+        assert "Apr 03" in app_module._fmt_timestamp("2026-04-03T14:00:00+00:00")
 
     def test_empty_string(self) -> None:
-        assert _fmt_timestamp("") == ""
+        assert app_module._fmt_timestamp("") == ""
 
     def test_invalid_string(self) -> None:
-        assert _fmt_timestamp("not-a-date") == "not-a-date"
+        assert app_module._fmt_timestamp("not-a-date") == "not-a-date"
 
 
 # -- _build_summary_line -----------------------------------------------------
