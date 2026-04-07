@@ -33,6 +33,40 @@ Every Medallion transformation introduces information loss. Most pipelines ignor
 | What does this application prove? | A Databricks-deployable transformation engine that scores every operation for coherence, resolves entities across multiple sources, reconciles temporal conflicts, and surfaces queryable evidence artifacts in a read-only operator dashboard. |
 | Why does it matter? | Moving data between layers is not the hard problem. Proving that the transformation preserved what it should, resolved what it needed to, and caught what it missed — with evidence — is the problem this solves. |
 
+## Key Exhibits
+
+### Exhibit 1: Forge Contract Registry
+
+The operator dashboard loads all registered forge contracts and shows every dataset with its version, source, target, and coherence engine. Eight datasets registered — all bound to Bronze-to-Silver transformation contracts with Shannon entropy coherence scoring.
+
+<p align="center">
+  <img src="assets/aetheriaforge-brand-system/marketplace/screenshots/01-registry.png" alt="Forge Registry tab showing 8 datasets registered with contract versions, source and target locations, and coherence engine" width="900"/>
+</p>
+
+### Exhibit 2: Transformation Status with Coherence Scores
+
+The Transformation Status tab surfaces evidence artifacts across all forge operations. Every row is one artifact: filename, dataset, verdict, coherence score, record counts, and timestamp. 1,008 artifacts shown with PASS, WARN, and FAIL verdicts — coherence scores make information loss immediately visible without opening a single file.
+
+<p align="center">
+  <img src="assets/aetheriaforge-brand-system/marketplace/screenshots/02-transformation-status.png" alt="Transformation Status tab showing 1008 evidence artifacts with PASS, WARN, and FAIL verdicts, coherence scores, and record counts" width="900"/>
+</p>
+
+### Exhibit 3: Full Evidence Artifact Inspection
+
+The Evidence Explorer loads a single evidence artifact by filename and renders the complete JSON payload inline. The artifact shown is a forge operation with a FAIL verdict: coherence score 0.0, with the full transformation context including dataset identity, record counts, and gate results.
+
+<p align="center">
+  <img src="assets/aetheriaforge-brand-system/marketplace/screenshots/03-evidence-explorer.png" alt="Evidence Explorer showing full JSON payload for a forge FAIL artifact including coherence score and transformation context" width="900"/>
+</p>
+
+### Exhibit 4: Visual Analytics Across All Forge Operations
+
+The Analytics tab scans the evidence directory and renders four charts: verdict distribution, coherence score distribution, daily activity volume, and coherence trend over time. Operators see transformation health at a glance across all registered datasets.
+
+<p align="center">
+  <img src="assets/aetheriaforge-brand-system/marketplace/screenshots/04-analytics.png" alt="Analytics tab showing verdict distribution, coherence score distribution, daily activity volume, and coherence trend charts" width="900"/>
+</p>
+
 ## The Business Problem
 
 Enterprises operating mature Lakehouse architectures face three transformation gaps that existing tools do not address:
