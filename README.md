@@ -19,6 +19,10 @@ Built by Anthony Johnson | EthereaLogic LLC
 
 ---
 
+> If this tool is useful to your team, consider [starring the repo](https://github.com/Org-EthereaLogic/AetheriaForge) — it helps others in the Databricks community find it.
+
+---
+
 Every Medallion transformation introduces information loss. Most pipelines ignore it. AetheriaForge measures it — scoring every transformation for coherence, reconciling entities across source systems, merging temporal conflicts, and enforcing schema contracts with versioned evolution. Every operation produces append-only evidence. Nothing is assumed to have passed unless the artifact says so.
 
 ## Executive Summary
