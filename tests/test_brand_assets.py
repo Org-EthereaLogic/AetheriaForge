@@ -45,7 +45,7 @@ def test_generated_asset_inventory_matches_documented_counts() -> None:
 
     assert counts == EXPECTED_GENERATED_COUNTS
     assert sum(counts.values()) == 25
-    assert sum(1 for path in BRAND_ROOT.rglob("*") if path.is_file()) == 27
+    assert sum(1 for path in BRAND_ROOT.rglob("*") if path.is_file()) == 31
 
 
 def test_brand_image_dimensions_match_expected_exports() -> None:
