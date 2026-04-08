@@ -625,12 +625,20 @@ wheels = [
 
 [[package]]
 name = "etherealogic-aetheriaforge"
-version = "0.1.0"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "pandas" },
     { name = "pyyaml" },
     { name = "scipy" },
+]
+
+[package.optional-dependencies]
+ingest = [
+    { name = "fastavro" },
+    { name = "lxml" },
+    { name = "openpyxl" },
+    { name = "pyarrow" },
 ]
 
 [package.dev-dependencies]
@@ -666,10 +674,15 @@ ingest = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastavro", marker = "extra == 'ingest'", specifier = ">=1.9" },
+    { name = "lxml", marker = "extra == 'ingest'", specifier = ">=5.0" },
+    { name = "openpyxl", marker = "extra == 'ingest'", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", marker = "extra == 'ingest'", specifier = ">=14.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "scipy", specifier = ">=1.11" },
 ]
+provides-extras = ["ingest"]
 
 [package.metadata.requires-dev]
 app = [
