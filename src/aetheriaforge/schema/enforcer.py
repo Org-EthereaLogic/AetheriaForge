@@ -86,15 +86,19 @@ class SchemaEnforcer:
 
         known_columns = {column.name for column in self.columns}
         extra_columns = sorted(column for column in df.columns if column not in known_columns)
-        if extra_columns and self.config.unknown_columns in {"reject", "quarantine"}:
+        if extra_columns:
             reason = f"Unknown columns present: {extra_columns}"
-            rejection_reasons.append(reason)
-            return EnforcementResult(
-                conformant=pd.DataFrame(columns=[c.name for c in self.columns]),
-                quarantined=df.copy().reset_index(drop=True),
-                coercions_applied=coercions_applied,
-                rejection_reasons=rejection_reasons,
-            )
+            if self.config.unknown_columns == "reject":
+                rejection_reasons.append(reason)
+                return EnforcementResult(
+                    conformant=pd.DataFrame(columns=[c.name for c in self.columns]),
+                    quarantined=df.copy().reset_index(drop=True),
+                    coercions_applied=coercions_applied,
+                    rejection_reasons=rejection_reasons,
+                )
+            if self.config.unknown_columns == "quarantine":
+                rejection_reasons.append(reason)
+                df = df[[column for column in df.columns if column in known_columns]].copy()
 
         # --- Missing required columns ------------------------------------------
         required_columns = [c.name for c in self.columns if not c.nullable]
