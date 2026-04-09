@@ -11,6 +11,8 @@ import pandas as pd
 from aetheriaforge.config.contract import ForgeContract
 from aetheriaforge.evidence.writer import EvidenceWriter
 from aetheriaforge.forge.entropy import shannon_coherence_score
+from aetheriaforge.forge.transformer import transform_dataframe
+from aetheriaforge.schema.contract import SchemaContract
 
 
 @dataclass
@@ -50,9 +52,9 @@ class ForgeResult:
 class ForgeEngine:
     """Coherence-scored transformation engine.
 
-    Evaluates information preservation between a *source* Bronze DataFrame and
-    a *forged* Silver DataFrame using Shannon entropy scoring, applies threshold
-    verdicts, and optionally writes evidence artifacts.
+    Transforms a Bronze DataFrame into a target-shaped DataFrame from a schema
+    contract, evaluates information preservation using Shannon entropy scoring,
+    applies threshold verdicts, and optionally writes evidence artifacts.
     """
 
     WARN_TOLERANCE: float = 0.05
@@ -112,3 +114,21 @@ class ForgeEngine:
             result.evidence_path = str(evidence_path)
 
         return result
+
+    def transform(
+        self,
+        source: pd.DataFrame,
+        schema_contract: SchemaContract,
+    ) -> pd.DataFrame:
+        """Transform *source* into the target shape declared by *schema_contract*."""
+        return transform_dataframe(source, schema_contract)
+
+    def transform_and_forge(
+        self,
+        source: pd.DataFrame,
+        schema_contract: SchemaContract,
+        target_layer: str = "silver",
+    ) -> tuple[pd.DataFrame, ForgeResult]:
+        """Transform *source* via the schema contract and score the outcome."""
+        forged = self.transform(source, schema_contract)
+        return forged, self.forge(source, forged, target_layer=target_layer)

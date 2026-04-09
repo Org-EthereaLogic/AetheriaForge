@@ -1,4 +1,4 @@
-"""Temporal reconciliation engine for CDC, SCD Type 2, and batch sources."""
+"""Temporal reconciliation engine using deterministic latest-record selection."""
 
 from __future__ import annotations
 

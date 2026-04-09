@@ -1,2 +1,2 @@
 # temporal
-Temporal reconciliation engine. Merges records across CDC, SCD Type 2, and batch sources.
+Temporal reconciliation engine. Applies deterministic `latest_wins` selection and records duplicate-timestamp conflicts in evidence.

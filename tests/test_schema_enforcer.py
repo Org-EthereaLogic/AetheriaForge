@@ -119,3 +119,51 @@ def test_from_dict_builds_enforcer() -> None:
     assert enforcer.columns[0].dtype == "int64"
     assert enforcer.columns[1].name == "value"
     assert enforcer.columns[1].dtype == "float64"
+
+
+def test_unknown_columns_reject_quarantines_all() -> None:
+    """unknown_columns='reject' quarantines the full frame on extra columns."""
+    df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["a", "b"],
+            "amount": [10.0, 20.0],
+            "extra": ["x", "y"],
+        }
+    )
+    config = SchemaContractConfig(
+        enforce=True,
+        evolution="versioned",
+        coerce_types=True,
+        unknown_columns="reject",
+    )
+    enforcer = SchemaEnforcer(_simple_schema(), config)
+
+    result = enforcer.enforce(df)
+
+    assert len(result.conformant) == 0
+    assert len(result.quarantined) == 2
+    assert any("Unknown columns present" in r for r in result.rejection_reasons)
+
+
+def test_null_violation_reject_quarantines_all() -> None:
+    """null_violation='reject' blocks the whole frame instead of row quarantine."""
+    df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["a", None],
+            "amount": [10.0, 20.0],
+        }
+    )
+    config = SchemaContractConfig(
+        enforce=True,
+        evolution="versioned",
+        coerce_types=True,
+        null_violation="reject",
+    )
+    enforcer = SchemaEnforcer(_simple_schema(), config)
+
+    result = enforcer.enforce(df)
+
+    assert len(result.conformant) == 0
+    assert len(result.quarantined) == 2

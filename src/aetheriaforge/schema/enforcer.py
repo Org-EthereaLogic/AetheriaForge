@@ -21,6 +21,11 @@ _DTYPE_MAP: dict[str, str] = {
 }
 
 
+def _normalize_dtype(raw: str) -> str:
+    """Map contract types to pandas dtypes."""
+    return _DTYPE_MAP.get(raw, raw)
+
+
 @dataclass(frozen=True)
 class ColumnSpec:
     """Expected column definition from a schema contract."""
@@ -44,7 +49,14 @@ class SchemaEnforcer:
     """Validate, coerce, and quarantine records against a schema contract."""
 
     def __init__(self, columns: list[ColumnSpec], config: SchemaContractConfig) -> None:
-        self.columns = columns
+        self.columns = [
+            ColumnSpec(
+                name=column.name,
+                dtype=_normalize_dtype(column.dtype),
+                nullable=column.nullable,
+            )
+            for column in columns
+        ]
         self.config = config
 
     @classmethod
@@ -57,7 +69,7 @@ class SchemaEnforcer:
         specs: list[ColumnSpec] = []
         for col in schema:
             raw_type = str(col.get("type", "string"))
-            mapped = _DTYPE_MAP.get(raw_type, raw_type)
+            mapped = _normalize_dtype(raw_type)
             specs.append(
                 ColumnSpec(
                     name=str(col["name"]),
@@ -71,6 +83,18 @@ class SchemaEnforcer:
         """Enforce the schema contract on *df* and return an :class:`EnforcementResult`."""
         coercions_applied: list[str] = []
         rejection_reasons: list[str] = []
+
+        known_columns = {column.name for column in self.columns}
+        extra_columns = sorted(column for column in df.columns if column not in known_columns)
+        if extra_columns and self.config.unknown_columns in {"reject", "quarantine"}:
+            reason = f"Unknown columns present: {extra_columns}"
+            rejection_reasons.append(reason)
+            return EnforcementResult(
+                conformant=pd.DataFrame(columns=[c.name for c in self.columns]),
+                quarantined=df.copy().reset_index(drop=True),
+                coercions_applied=coercions_applied,
+                rejection_reasons=rejection_reasons,
+            )
 
         # --- Missing required columns ------------------------------------------
         required_columns = [c.name for c in self.columns if not c.nullable]
@@ -129,10 +153,22 @@ class SchemaEnforcer:
                     f"Null violation in non-nullable column '{spec.name}': "
                     f"{n_nulls} row(s) quarantined"
                 )
+                if self.config.null_violation == "reject":
+                    return EnforcementResult(
+                        conformant=pd.DataFrame(columns=[c.name for c in self.columns]),
+                        quarantined=working.copy().reset_index(drop=True),
+                        coercions_applied=coercions_applied,
+                        rejection_reasons=rejection_reasons,
+                    )
                 null_mask = null_mask | col_nulls
 
         conformant = working[~null_mask].reset_index(drop=True)
         quarantined = working[null_mask].reset_index(drop=True)
+
+        if self.config.unknown_columns == "ignore":
+            keep_columns = [column.name for column in self.columns if column.name in conformant.columns]
+            conformant = conformant[keep_columns].reset_index(drop=True)
+            quarantined = quarantined[keep_columns].reset_index(drop=True)
 
         return EnforcementResult(
             conformant=conformant,

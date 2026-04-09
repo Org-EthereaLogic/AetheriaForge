@@ -11,7 +11,7 @@ workspace, this module enables cross-product communication:
   resolution outcomes, schema versions) to a shared directory that
   DriftSentinel can consume.
 - **Drift ingestion** — receive drift payloads from DriftSentinel and route
-  them into a remediation workflow.
+  them into evidence-backed follow-up actions.
 
 ## Standalone Mode
 

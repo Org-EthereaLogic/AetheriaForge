@@ -178,7 +178,7 @@ def test_batch_run_writes_evidence(tmp_path: Path) -> None:
     batch = runner.run(inputs)
 
     evidence_files = list((tmp_path / "evidence").glob("*.json"))
-    assert len(evidence_files) == 2
+    assert len(evidence_files) == 4
     assert batch.results["ds_a"].evidence_path is not None
     assert batch.results["ds_b"].evidence_path is not None
 

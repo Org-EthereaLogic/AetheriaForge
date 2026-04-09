@@ -64,7 +64,7 @@ def _series_to_dict(s: pd.Series) -> dict[str, Any]:  # type: ignore[type-arg]
 
 
 class EntityResolver:
-    """Resolve entities across two sources using configurable matching rules.
+    """Resolve entities across two sources using configured exact key rules.
 
     Only the ``exact`` matching strategy is supported in v1.x.
     """
@@ -178,42 +178,48 @@ class EntityResolver:
 
         # --- Build decisions (summary-level, not per-row for large datasets) ---
         decisions: list[MatchDecision] = []
-
-        # Sample up to 1000 decisions to avoid massive memory for large datasets
         sample_limit = 1000
+        include_rejected = (
+            self.policy.record_all_decisions and self.policy.include_rejected_matches
+        )
 
-        # NO_MATCH decisions
-        no_match_primary = primary_df.iloc[primary.index[no_match_mask]]
-        for _, row in no_match_primary.head(sample_limit).iterrows():
-            decisions.append(MatchDecision(
-                primary_key_values={k: row[k] for k in primary_keys},
-                secondary_key_values=None,
-                match_type="exact",
-                confidence=0.0,
-                verdict="NO_MATCH",
-            ))
+        if include_rejected:
+            no_match_primary = primary_df.iloc[primary.index[no_match_mask]]
+            for _, row in no_match_primary.head(sample_limit).iterrows():
+                decisions.append(
+                    MatchDecision(
+                        primary_key_values={k: row[k] for k in primary_keys},
+                        secondary_key_values=None,
+                        match_type="exact",
+                        confidence=0.0,
+                        verdict="NO_MATCH",
+                    )
+                )
 
-        # MATCHED decisions
         single_primary = primary_df.iloc[primary.index[single_match_mask]]
         for _, row in single_primary.head(sample_limit).iterrows():
-            decisions.append(MatchDecision(
-                primary_key_values={k: row[k] for k in primary_keys},
-                secondary_key_values=None,
-                match_type="exact",
-                confidence=1.0,
-                verdict="MATCHED",
-            ))
+            decisions.append(
+                MatchDecision(
+                    primary_key_values={k: row[k] for k in primary_keys},
+                    secondary_key_values=None,
+                    match_type="exact",
+                    confidence=1.0,
+                    verdict="MATCHED",
+                )
+            )
 
-        # AMBIGUOUS decisions
-        amb_primary = primary_df.iloc[primary.index[ambiguous_mask]]
-        for _, row in amb_primary.head(sample_limit).iterrows():
-            decisions.append(MatchDecision(
-                primary_key_values={k: row[k] for k in primary_keys},
-                secondary_key_values=None,
-                match_type="exact",
-                confidence=0.0,
-                verdict="AMBIGUOUS",
-            ))
+        if include_rejected:
+            amb_primary = primary_df.iloc[primary.index[ambiguous_mask]]
+            for _, row in amb_primary.head(sample_limit).iterrows():
+                decisions.append(
+                    MatchDecision(
+                        primary_key_values={k: row[k] for k in primary_keys},
+                        secondary_key_values=None,
+                        match_type="exact",
+                        confidence=0.0,
+                        verdict="AMBIGUOUS",
+                    )
+                )
 
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 

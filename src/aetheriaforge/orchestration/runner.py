@@ -26,7 +26,7 @@ class DatasetInput:
     """All data needed to run a forge pipeline for one dataset."""
 
     source_df: pd.DataFrame
-    forged_df: pd.DataFrame
+    forged_df: pd.DataFrame | None = None
     schema_columns: list[ColumnSpec] | None = None
     secondary_df: pd.DataFrame | None = None
     resolution_policy: ResolutionPolicy | None = None

@@ -114,29 +114,167 @@ print(f"Evidence dir:    {resolved_evidence_dir}")
 # MAGIC %md
 # MAGIC ## Load Data
 # MAGIC
-# MAGIC When `catalog` is set, data is read from Unity Catalog (contract-backed mode).
-# MAGIC When `catalog` is blank, a small synthetic dataset is used for demo purposes.
+# MAGIC The notebook loads real source data from the forge contract when a table or
+# MAGIC file path is configured. Demo mode is only used when no real source surface
+# MAGIC is configured.
 # MAGIC **Demo runs are explicitly tagged in the evidence artifact and should not be
 # MAGIC treated as production results.**
 
 # COMMAND ----------
 
+import json
+
 import pandas as pd
+
+from aetheriaforge.ingest import FileIngestor
+from aetheriaforge.integration import (
+    DriftIngester,
+    FileEventChannel,
+    discover_bundled_config,
+)
+
+
+def _surface_table_name(
+    *,
+    catalog_name: str,
+    schema_name: str,
+    table_name: str,
+) -> str:
+    if not table_name:
+        msg = "Table name is required for table-backed execution"
+        raise ValueError(msg)
+    return ".".join(part for part in (catalog_name, schema_name, table_name) if part)
+
+
+def _load_surface(
+    *,
+    label: str,
+    table_name: str = "",
+    path: str = "",
+    file_format: str = "",
+    options: dict[str, object] | None = None,
+    catalog_name: str = "",
+    schema_name: str = "",
+) -> pd.DataFrame:
+    if path:
+        resolved_path = contract.resolve_relative_path(path)
+        ingestor = FileIngestor()
+        result = ingestor.ingest(
+            resolved_path,
+            file_format=file_format or None,
+            options=dict(options or {}),
+        )
+        if not result.ok:
+            msg = "; ".join(result.errors) or f"Failed to ingest {label}"
+            raise RuntimeError(msg)
+        print(f"Loaded {label} from file: {resolved_path} ({len(result.df)} rows)")
+        return result.df
+
+    if table_name:
+        full_name = _surface_table_name(
+            catalog_name=catalog_name,
+            schema_name=schema_name,
+            table_name=table_name,
+        )
+        frame = spark.table(full_name).toPandas()  # type: ignore[name-defined]
+        print(f"Loaded {label} from Unity Catalog: {full_name} ({len(frame)} rows)")
+        return frame
+
+    msg = f"No {label} surface configured in the forge contract"
+    raise ValueError(msg)
+
+
+def _write_target_surface(df: pd.DataFrame) -> None:
+    target_catalog = catalog.strip() or contract.target_catalog
+    target_schema = schema.strip() or contract.target_schema
+    if contract.target_table and target_catalog and target_schema:
+        target_name = _surface_table_name(
+            catalog_name=target_catalog,
+            schema_name=target_schema,
+            table_name=contract.target_table,
+        )
+        spark.createDataFrame(df).write.mode("overwrite").saveAsTable(target_name)  # type: ignore[name-defined]
+        print(f"Wrote forged output to Unity Catalog: {target_name} ({len(df)} rows)")
+        return
+
+    if contract.target_path:
+        target_path = contract.resolve_relative_path(contract.target_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_format = (contract.target_format or target_path.suffix.lstrip(".")).lower()
+        if target_format in {"parquet", "pq"}:
+            df.to_parquet(target_path, index=False)
+        elif target_format in {"json", "jsonl", "ndjson"}:
+            lines = target_format in {"jsonl", "ndjson"}
+            df.to_json(target_path, orient="records", lines=lines)
+        elif target_format in {"csv", "tsv"}:
+            separator = "\t" if target_format == "tsv" else ","
+            df.to_csv(target_path, index=False, sep=separator)
+        else:
+            msg = f"Unsupported target file format '{target_format}'"
+            raise ValueError(msg)
+        print(f"Wrote forged output to file: {target_path} ({len(df)} rows)")
+        return
+
+    print("No target surface configured; forged output was computed but not written.")
+
+
+def _load_secondary_df() -> pd.DataFrame | None:
+    secondary = contract.resolution_secondary_source()
+    if secondary is None:
+        return None
+    return _load_surface(
+        label="secondary dataset",
+        table_name=str(secondary.get("table", "")),
+        path=str(secondary.get("path", "")),
+        file_format=str(secondary.get("format", "")),
+        options=dict(secondary.get("options", {})),
+        catalog_name=str(
+            secondary.get("catalog", catalog.strip() or contract.source_catalog)
+        ),
+        schema_name=str(
+            secondary.get("schema", schema.strip() or contract.source_schema)
+        ),
+    )
+
+
+def _resolve_event_channel():
+    bundled_cfg = discover_bundled_config(contract_raw=contract.raw)
+    if not bundled_cfg.enabled or not bundled_cfg.events_dir.strip():
+        return None
+    events_dir = contract.resolve_relative_path(bundled_cfg.events_dir)
+    return FileEventChannel(events_dir)
+
 
 _execution_mode: str
 
-if catalog.strip():
-    # --- Contract-backed mode: load real data from Unity Catalog ---
-    _table = f"{catalog}.{schema}.{contract.source_table}"
-    _target_table = f"{catalog}.{schema}.{contract.target_table}"
-    source_df = spark.table(_table).toPandas()  # type: ignore[name-defined]
-    forged_df = spark.table(_target_table).toPandas()  # type: ignore[name-defined]
+if contract.source_table and catalog.strip():
+    source_catalog = catalog.strip() or contract.source_catalog
+    source_schema = schema.strip() or contract.source_schema
+    source_df = _load_surface(
+        label="source dataset",
+        table_name=contract.source_table,
+        catalog_name=source_catalog,
+        schema_name=source_schema,
+    )
     _execution_mode = "contract_backed"
-    print(f"Loaded source from Unity Catalog: {_table} ({len(source_df)} rows)")
-    print(f"Loaded forged from Unity Catalog: {_target_table} ({len(forged_df)} rows)")
+elif contract.source_table and contract.source_catalog and contract.source_schema:
+    source_df = _load_surface(
+        label="source dataset",
+        table_name=contract.source_table,
+        catalog_name=contract.source_catalog,
+        schema_name=contract.source_schema,
+    )
+    _execution_mode = "contract_backed"
+elif contract.source_path:
+    source_df = _load_surface(
+        label="source dataset",
+        path=contract.source_path,
+        file_format=contract.source_format,
+        options=contract.source_options,
+    )
+    _execution_mode = "contract_backed"
 else:
-    # --- Demo mode: synthetic data for smoke-testing only ---
-    print("WARNING: No catalog provided. Running in DEMO mode with synthetic data.")
+    print("WARNING: No source surface configured. Running in DEMO mode with synthetic data.")
     print("Evidence artifacts from this run will be tagged execution_mode='demo'.")
     print("These results do NOT reflect real data quality.\n")
     source_df = pd.DataFrame(
@@ -150,12 +288,11 @@ else:
             "updated_at": pd.Timestamp.now(),
         }
     )
-    forged_df = source_df.copy()
-    forged_df["amount"] = forged_df["amount"] * 1.1  # simulate a transformation
     _execution_mode = "demo"
 
+secondary_df = _load_secondary_df()
+
 print(f"Source rows:     {len(source_df)}")
-print(f"Forged rows:     {len(forged_df)}")
 print(f"Execution mode:  {_execution_mode}")
 
 # COMMAND ----------
@@ -169,14 +306,45 @@ from aetheriaforge.evidence.writer import EvidenceWriter
 from aetheriaforge.orchestration.pipeline import ForgePipeline
 
 writer = EvidenceWriter(resolved_evidence_dir)
-pipeline = ForgePipeline(contract, evidence_writer=writer)
+event_channel = _resolve_event_channel()
+pipeline = ForgePipeline(
+    contract,
+    evidence_writer=writer,
+    event_channel=event_channel,
+)
+
+bundled_cfg = discover_bundled_config(contract_raw=contract.raw)
+if bundled_cfg.enabled and bundled_cfg.auto_ingest and bundled_cfg.drift_dir.strip():
+    drift_dir = contract.resolve_relative_path(bundled_cfg.drift_dir)
+    registry = None
+    from aetheriaforge.config.registry import DatasetRegistry
+
+    registry = DatasetRegistry()
+    registry.register(contract)
+    actions = DriftIngester(
+        drift_dir,
+        registry,
+        evidence_writer=writer,
+    ).ingest_all()
+    if actions:
+        print("Drift remediation actions:")
+        for action in actions:
+            print(
+                f"  {action.dataset_name}: {action.action} "
+                f"({action.drift_gate_verdict})"
+            )
 
 result = pipeline.run(
     source_df=source_df,
-    forged_df=forged_df,
+    secondary_df=secondary_df,
     target_layer=target_layer,
     execution_mode=_execution_mode,
 )
+
+if result.pipeline_verdict == "FAIL":
+    print("Target write blocked: pipeline verdict is FAIL.")
+elif result.forged_df is not None:
+    _write_target_surface(result.forged_df)
 
 # COMMAND ----------
 
@@ -190,6 +358,7 @@ print(f"Pipeline verdict: {result.pipeline_verdict}")
 print(f"Execution mode:   {result.execution_mode}")
 print(f"Source location:  {result.source_location}")
 print(f"Contract version: {result.contract_version}")
+print(f"Schema version:   {result.schema_version or '—'}")
 print(f"Run at:           {result.run_at}")
 print(f"Coherence score:  {result.forge_result.coherence_score:.6f}")
 print(f"Threshold:        {result.forge_result.threshold}")

@@ -1,2 +1,2 @@
 # forge
-Coherence-scored transformation engine. Transforms Bronze records into Silver-ready structures scored with Shannon entropy.
+Contract-driven transformation and coherence-scoring engine. Transforms source records into schema-contract output and scores the result with Shannon entropy.

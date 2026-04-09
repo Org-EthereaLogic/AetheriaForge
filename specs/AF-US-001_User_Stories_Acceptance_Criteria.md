@@ -35,16 +35,18 @@ transformations below threshold produce explicit FAIL with reasons.
 As an integration architect, I want cross-source entity resolution that
 reconciles different identifiers for the same entity across systems.
 
-Acceptance: configurable matching rules, deterministic resolution, every match
-decision recorded in evidence.
+Acceptance: configured exact key-based matching, deterministic resolution,
+configurable ambiguity handling, every recorded match decision written to
+evidence.
 
 ## Story 5 — Pipeline Operator
 
-As a pipeline operator, I want temporal reconciliation that handles CDC, SCD
-Type 2, and batch merge conflicts with explicit conflict reporting.
+As a pipeline operator, I want temporal reconciliation that selects the
+deterministic latest record per entity and reports explicit timestamp
+conflicts.
 
-Acceptance: merge conflicts detected and recorded, configurable resolution
-behavior, deterministic merge results.
+Acceptance: duplicate-timestamp conflicts detected and recorded, configurable
+conflict behavior, deterministic merge results.
 
 ## Story 6 — Technical Lead
 
@@ -72,16 +74,18 @@ gate enforced.
 ## Story 9 — EthereaLogic Suite Operator
 
 As an operator using the EthereaLogic Suite, I want ÆtheriaForge to receive
-drift signals from DriftSentinel and attempt auto-remediation of forged output.
+drift signals from DriftSentinel and produce evidence-backed follow-up actions
+for forged output.
 
 Acceptance: integration is opt-in, standalone mode is default, event interface
-documented, drift payloads routed into remediation workflow when bundled.
+documented, drift payloads routed into follow-up action evidence when bundled.
 
 ## Story 10 — Schema Governance Owner
 
-As a schema governance owner, I want schema contracts with versioned evolution
-so that contract changes are tracked and older evidence retains the version
-active when forging occurred.
+As a schema governance owner, I want immutable schema contract versions
+recorded in evidence so older runs retain the version active when forging
+occurred.
 
-Acceptance: contract versions are immutable once published, evolution creates
-new versions, evidence artifacts record the contract version used.
+Acceptance: contract versions are immutable once published, evidence artifacts
+record the contract version used, and runtime behavior honors the configured
+contract version.

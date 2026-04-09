@@ -1,2 +1,2 @@
 # schema
-Schema enforcement and evolution management.
+Schema-contract loading and schema enforcement with recorded contract versions.

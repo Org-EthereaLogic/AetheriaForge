@@ -92,7 +92,7 @@ class RemediationAction:
 
 
 class DriftIngester:
-    """Ingest drift reports from a shared directory and route into remediation.
+    """Ingest drift reports from a shared directory and classify follow-up work.
 
     Reads ``ds-drift-*.json`` files from *drift_dir*, parses them into
     :class:`DriftReport` instances, and routes each into a
