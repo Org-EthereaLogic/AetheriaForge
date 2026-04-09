@@ -151,9 +151,6 @@ def _apply_transform(
                     column_name=column.name,
                 ).astype("string")
             )
-        if not parts:
-            msg = f"Transformation 'concat' requires at least one series for '{column.name}'"
-            raise TransformationError(msg)
         separator = step.separator
         combined = parts[0].fillna("")
         for extra in parts[1:]:
