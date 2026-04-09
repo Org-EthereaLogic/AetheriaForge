@@ -79,6 +79,7 @@ class PipelineResult:
         if self.include_forged_df or self.execution_mode == "notebook":
             return
         self.forged_df = None
+
     def as_dict(self) -> dict[str, Any]:
         """Return the result as a dictionary with an ``event`` key."""
         result: dict[str, Any] = {
@@ -140,6 +141,7 @@ class ForgePipeline:
         temporal_config: TemporalConfig | None = None,
         target_layer: str = "silver",
         execution_mode: str = "unverified",
+        include_forged_df: bool = False,
     ) -> PipelineResult:
         """Execute the full forge pipeline and return a :class:`PipelineResult`."""
         if execution_mode not in EXECUTION_MODES:
@@ -203,7 +205,7 @@ class ForgePipeline:
         working_forged = transformed_df
 
         effective_schema_config = self.contract.schema_contract
-        if schema_definition is not None:
+        if schema_definition is not None and "enforcement" in schema_definition.raw:
             effective_schema_config = replace(
                 effective_schema_config,
                 coerce_types=schema_definition.enforcement.type_coercion,
@@ -272,6 +274,7 @@ class ForgePipeline:
             contract_version=self.contract.dataset_version,
             schema_version=schema_version,
             forged_df=working_forged,
+            include_forged_df=include_forged_df,
         )
 
         if self.evidence_writer is not None:

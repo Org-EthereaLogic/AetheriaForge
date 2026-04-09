@@ -6,6 +6,7 @@ Traces: AF-SR-006, AF-FR-004
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
@@ -118,6 +119,24 @@ def test_loads_referenced_schema_contract(tmp_path: Path) -> None:
     assert schema_contract.columns[0].name == "id"
 
 
+def test_inline_schema_contract_reuses_dataset_version_defaults() -> None:
+    """Inline schema contracts inherit dataset metadata when contract block is omitted."""
+    data = _minimal_contract_data()
+    data["schema_contract"] = {  # type: ignore[index]
+        "enforce": True,
+        "evolution": "versioned",
+        "coerce_types": True,
+        "columns": [{"name": "id", "type": "long", "nullable": False}],
+    }
+
+    contract = ForgeContract.from_dict(data)
+    schema_contract = contract.load_schema_contract()
+
+    assert schema_contract is not None
+    assert schema_contract.version == "1.0.0"
+    assert schema_contract.name == "test_ds_schema"
+
+
 def test_loads_referenced_resolution_policy(tmp_path: Path) -> None:
     """A forge contract can resolve a relative resolution policy path."""
     policy_path = tmp_path / "resolution_policy.yml"
@@ -174,3 +193,108 @@ def test_builds_temporal_config_from_contract() -> None:
 
     assert temporal is not None
     assert temporal.timestamp_column == "updated_at"
+
+
+def test_null_options_normalize_to_empty_dict() -> None:
+    """Optional source/target options accept explicit null YAML values."""
+    data = _minimal_contract_data()
+    source = cast(dict[str, object], data["source"])
+    target = cast(dict[str, object], data["target"])
+    data["source"] = {**source, "options": None}
+    data["target"] = {**target, "options": None}
+
+    contract = ForgeContract.from_dict(data)
+
+    assert contract.source_options == {}
+    assert contract.target_options == {}
+
+
+def test_invalid_options_type_raises() -> None:
+    """Non-mapping options fail closed with a clear contract error."""
+    data = _minimal_contract_data()
+    source = cast(dict[str, object], data["source"])
+    data["source"] = {**source, "options": "bad"}
+
+    with pytest.raises(ValueError, match="source.options"):
+        ForgeContract.from_dict(data)
+
+
+def test_mapping_options_are_preserved() -> None:
+    """Mapping-valued source/target options are retained verbatim."""
+    data = _minimal_contract_data()
+    source = cast(dict[str, object], data["source"])
+    target = cast(dict[str, object], data["target"])
+    data["source"] = {**source, "options": {"header": True}}
+    data["target"] = {**target, "options": {"mode": "overwrite"}}
+
+    contract = ForgeContract.from_dict(data)
+
+    assert contract.source_options == {"header": True}
+    assert contract.target_options == {"mode": "overwrite"}
+
+
+def test_resolve_relative_path_uses_repo_root_when_unloaded() -> None:
+    """Relative paths fall back to repo_root when no source file path is known."""
+    contract = ForgeContract.from_dict(_minimal_contract_data())
+
+    resolved = contract.resolve_relative_path("templates/forge_contract.yml")
+
+    assert resolved == Path.cwd() / "templates" / "forge_contract.yml"
+
+
+def test_resolve_relative_path_preserves_absolute_paths() -> None:
+    """Absolute path references are returned unchanged."""
+    contract = ForgeContract.from_dict(_minimal_contract_data())
+    absolute = Path("/tmp/aetheriaforge.yml")
+
+    assert contract.resolve_relative_path(str(absolute)) == absolute
+
+
+def test_load_temporal_config_returns_none_when_incomplete() -> None:
+    """Incomplete inline temporal config is ignored rather than half-applied."""
+    data = _minimal_contract_data()
+    data["temporal"] = {  # type: ignore[index]
+        "enabled": True,
+        "merge_strategy": "latest_wins",
+    }
+
+    contract = ForgeContract.from_dict(data)
+
+    assert contract.load_temporal_config() is None
+
+
+def test_schema_contract_requires_columns_section() -> None:
+    """SchemaContract validation fails closed when columns are missing."""
+    with pytest.raises(ValueError, match="missing required section"):
+        SchemaContract.from_dict({"contract": {"name": "schema"}})
+
+
+def test_schema_contract_rejects_invalid_transform_shape() -> None:
+    """Transform steps must be mappings with an explicit op."""
+    with pytest.raises(ValueError, match="expected a mapping"):
+        SchemaContract.from_dict(
+            {
+                "contract": {"name": "schema", "version": "1.0.0"},
+                "columns": [
+                    {
+                        "name": "name",
+                        "type": "string",
+                        "transforms": ["upper"],
+                    }
+                ],
+            }
+        )
+
+    with pytest.raises(ValueError, match="required transform key 'op'"):
+        SchemaContract.from_dict(
+            {
+                "contract": {"name": "schema", "version": "1.0.0"},
+                "columns": [
+                    {
+                        "name": "name",
+                        "type": "string",
+                        "transforms": [{"value": "upper"}],
+                    }
+                ],
+            }
+        )

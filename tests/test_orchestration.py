@@ -204,7 +204,7 @@ def test_pipeline_transforms_from_inline_schema_contract() -> None:
     pipeline = ForgePipeline(contract)
     source = _diverse_df(5)
 
-    result = pipeline.run(source)
+    result = pipeline.run(source, include_forged_df=True)
 
     assert result.pipeline_verdict == "PASS"
     assert result.forged_df is not None
@@ -334,6 +334,106 @@ def test_pipeline_enabled_resolution_requires_secondary_df() -> None:
 
     with pytest.raises(ValueError, match="secondary dataset was provided"):
         pipeline.run(_diverse_df(5), _diverse_df(5))
+
+
+def test_pipeline_missing_schema_contract_for_transform_raises(
+    contract: ForgeContract,
+) -> None:
+    """Transformation requires either forged_df or a schema contract."""
+    pipeline = ForgePipeline(contract)
+
+    with pytest.raises(ValueError, match="No forged_df was supplied"):
+        pipeline.run(_diverse_df(5))
+
+
+def test_pipeline_resolution_enabled_requires_policy_definition() -> None:
+    """Enabled resolution fails closed when no policy is configured."""
+    contract = ForgeContract.from_dict(
+        {
+            **_contract_data(),
+            "resolution": {"enabled": True},
+        }
+    )
+    pipeline = ForgePipeline(contract)
+
+    with pytest.raises(ValueError, match="resolution policy is configured"):
+        pipeline.run(_diverse_df(5), _diverse_df(5), secondary_df=_diverse_df(5))
+
+
+def test_pipeline_temporal_enabled_requires_complete_config() -> None:
+    """Enabled temporal reconciliation fails closed when config is incomplete."""
+    contract = ForgeContract.from_dict(
+        {
+            **_contract_data(),
+            "temporal": {"enabled": True, "merge_strategy": "latest_wins"},
+        }
+    )
+    pipeline = ForgePipeline(contract)
+
+    with pytest.raises(ValueError, match="required temporal configuration is missing"):
+        pipeline.run(_diverse_df(5), _diverse_df(5))
+
+
+def test_pipeline_schema_contract_defaults_to_forge_contract_enforcement() -> None:
+    """Forge-contract enforcement remains the fallback when schema contract omits it."""
+    contract = ForgeContract.from_dict(
+        {
+            **_contract_data(),
+            "schema_contract": {
+                "enforce": True,
+                "evolution": "versioned",
+                "coerce_types": True,
+                "unknown_columns": "reject",
+                "null_violation": "reject",
+                "contract": {
+                    "name": "pipeline_schema",
+                    "version": "2.0.0",
+                    "layer": "silver",
+                },
+                "columns": [{"name": "id", "type": "long", "nullable": False}],
+            },
+        }
+    )
+    pipeline = ForgePipeline(contract)
+    forged = pd.DataFrame({"id": [1], "extra": ["x"]})
+
+    result = pipeline.run(
+        pd.DataFrame({"id": [1]}),
+        forged,
+        include_forged_df=True,
+    )
+
+    assert result.enforcement_result is not None
+    assert len(result.enforcement_result.quarantined) == 1
+    assert result.enforcement_result.conformant.empty
+
+
+def test_pipeline_include_forged_df_controls_result_retention() -> None:
+    """The caller can opt into retaining the forged DataFrame on the result."""
+    contract = ForgeContract.from_dict(
+        {
+            **_contract_data(),
+            "schema_contract": {
+                "enforce": False,
+                "evolution": "versioned",
+                "coerce_types": True,
+                "contract": {
+                    "name": "pipeline_schema",
+                    "version": "2.0.0",
+                    "layer": "silver",
+                },
+                "columns": [{"name": "id", "type": "long", "nullable": False}],
+            },
+        }
+    )
+    pipeline = ForgePipeline(contract)
+    source = pd.DataFrame({"id": [1]})
+
+    default_result = pipeline.run(source)
+    kept_result = pipeline.run(source, include_forged_df=True)
+
+    assert default_result.forged_df is None
+    assert kept_result.forged_df is not None
 
 
 # --- Evidence tests -----------------------------------------------------------

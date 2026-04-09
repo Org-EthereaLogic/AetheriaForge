@@ -327,7 +327,7 @@ if bundled_cfg.enabled and bundled_cfg.auto_ingest and bundled_cfg.drift_dir.str
         evidence_writer=writer,
     ).ingest_all()
     if actions:
-        print("Drift remediation actions:")
+        print("Drift follow-up actions:")
         for action in actions:
             print(
                 f"  {action.dataset_name}: {action.action} "
@@ -339,6 +339,7 @@ result = pipeline.run(
     secondary_df=secondary_df,
     target_layer=target_layer,
     execution_mode=_execution_mode,
+    include_forged_df=True,
 )
 
 if result.pipeline_verdict == "FAIL":

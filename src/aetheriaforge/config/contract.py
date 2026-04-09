@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -14,6 +15,16 @@ if TYPE_CHECKING:
     from aetheriaforge.resolution.policy import ResolutionPolicy
     from aetheriaforge.schema.contract import SchemaContract
     from aetheriaforge.temporal.reconciler import TemporalConfig
+
+
+def _options_mapping(raw: Any, *, field_name: str) -> dict[str, Any]:
+    """Normalize optional options mappings from YAML."""
+    if raw is None:
+        return {}
+    if isinstance(raw, Mapping):
+        return dict(raw)
+    msg = f"Forge contract field '{field_name}' must be a mapping when provided"
+    raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -132,13 +143,19 @@ class ForgeContract:
             source_table=str(src.get("table", "")),
             source_path=str(src.get("path", "")),
             source_format=str(src.get("format", "")),
-            source_options=dict(src.get("options", {})),
+            source_options=_options_mapping(
+                src.get("options"),
+                field_name="source.options",
+            ),
             target_catalog=str(tgt.get("catalog", "")),
             target_schema=str(tgt.get("schema", "")),
             target_table=str(tgt.get("table", "")),
             target_path=str(tgt.get("path", "")),
             target_format=str(tgt.get("format", "")),
-            target_options=dict(tgt.get("options", {})),
+            target_options=_options_mapping(
+                tgt.get("options"),
+                field_name="target.options",
+            ),
             coherence=coherence,
             schema_contract=schema_contract,
             resolution_enabled=bool(resolution.get("enabled", False)),
@@ -169,7 +186,7 @@ class ForgeContract:
             return SchemaContract.from_yaml(self.resolve_relative_path(path))
 
         if "columns" in section:
-            inline = {
+            inline: dict[str, Any] = {
                 "contract": section.get(
                     "contract",
                     {
@@ -179,8 +196,9 @@ class ForgeContract:
                     },
                 ),
                 "columns": section.get("columns", []),
-                "enforcement": section.get("enforcement", {}),
             }
+            if "enforcement" in section:
+                inline["enforcement"] = section.get("enforcement", {})
             return SchemaContract.from_dict(inline)
 
         return None
