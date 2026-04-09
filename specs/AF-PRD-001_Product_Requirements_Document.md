@@ -33,12 +33,12 @@ preserves explicit failure behavior and evidence traceability throughout.
 - pre-implementation quality-control integration (Codacy, Codecov, Snyk)
 - Shannon entropy scoring engine for v1.x (no proprietary UMIF constructs)
 - coherence-scored transformation pipeline (Bronze → Silver → Gold)
-- cross-source entity resolution engine
-- temporal reconciliation with merge-conflict detection
-- schema enforcement and versioned evolution management
+- cross-source entity resolution engine using exact key-based matching in v1.x
+- temporal reconciliation with deterministic `latest_wins` merge-conflict detection in v1.x
+- schema enforcement with immutable contract version recording
 - transformation audit trail with append-only evidence
 - event emission interface for DriftSentinel integration (bundled mode)
-- drift payload ingestion interface for auto-remediation (bundled mode)
+- drift payload ingestion interface for evidence-backed follow-up actions (bundled mode)
 - declarative forge configuration through YAML contracts
 - Databricks Asset Bundle deployment
 - onboarding, execution, and review notebooks
@@ -65,14 +65,14 @@ preserves explicit failure behavior and evidence traceability throughout.
 | AF-FR-004 | Register datasets and forge contracts through declarative configuration |
 | AF-FR-005 | Score every transformation for coherence using Shannon entropy |
 | AF-FR-006 | Transform Bronze records into Silver-ready structures against a schema contract |
-| AF-FR-007 | Resolve entity identifiers across multiple source systems |
-| AF-FR-008 | Reconcile temporal inconsistencies across CDC, SCD Type 2, and batch sources |
-| AF-FR-009 | Enforce schema contracts with versioned evolution support |
+| AF-FR-007 | Resolve entity identifiers across multiple source systems using configured exact matching in v1.x |
+| AF-FR-008 | Reconcile temporal inconsistencies using deterministic `latest_wins` selection with explicit conflict reporting in v1.x |
+| AF-FR-009 | Enforce schema contracts and record immutable contract versions in evidence |
 | AF-FR-010 | Produce human-readable and machine-readable transformation evidence |
 | AF-FR-011 | Preserve explicit failure reasons — no silent data loss or coercion |
 | AF-FR-012 | Record transformation metadata for replayable evidence |
 | AF-FR-013 | Emit transformation events consumable by DriftSentinel when bundled |
-| AF-FR-014 | Ingest drift payloads from DriftSentinel for auto-remediation when bundled |
+| AF-FR-014 | Ingest drift payloads from DriftSentinel into evidence-backed follow-up actions when bundled |
 | AF-FR-015 | Scaffold Codacy, Codecov, and Snyk before product implementation |
 | AF-FR-016 | Define evidence-backed Notion dashboard sync policy |
 | AF-FR-017 | Provide an operator dashboard for transformation review and evidence inspection |

@@ -45,10 +45,10 @@ aetheriaforge/
 ### Application Layer
 
 - `src/aetheriaforge/ingest/` — enterprise file ingestion (CSV, Parquet, JSON, Excel, XML, ORC, Avro, etc.)
-- `src/aetheriaforge/forge/` — coherence-scored transformation engine
-- `src/aetheriaforge/resolution/` — cross-source entity resolution
-- `src/aetheriaforge/temporal/` — temporal reconciliation and merge logic
-- `src/aetheriaforge/schema/` — schema enforcement and evolution management
+- `src/aetheriaforge/forge/` — contract-driven transformation and coherence scoring
+- `src/aetheriaforge/resolution/` — exact-match cross-source entity resolution
+- `src/aetheriaforge/temporal/` — `latest_wins` temporal reconciliation and conflict logic
+- `src/aetheriaforge/schema/` — schema-contract loading and schema enforcement
 - `src/aetheriaforge/evidence/` — append-only transformation artifact writing
 - `src/aetheriaforge/orchestration/` — workflow sequencing for the forge pipeline
 - `src/aetheriaforge/config/` — forge contract and policy configuration
@@ -64,7 +64,7 @@ aetheriaforge/
 - Event emission: publish transformation events (coherence scores, resolution
   outcomes, schema versions) to a channel DriftSentinel can consume
 - Drift ingestion: receive drift payloads from DriftSentinel and route into
-  the remediation workflow
+  evidence-backed follow-up actions
 - This layer is inactive by default; enabled only when bundled mode is configured
 
 ## 3. Module Responsibilities
@@ -73,9 +73,9 @@ aetheriaforge/
 | --- | --- | --- |
 | `ingest/` | Enterprise file format ingestion | Pre-Bronze (file → DataFrame) |
 | `forge/` | Coherence-scored transformations | Bronze → Silver |
-| `resolution/` | Cross-source entity reconciliation | Silver |
-| `temporal/` | Temporal record reconciliation | Silver |
-| `schema/` | Schema enforcement and evolution | Silver → Gold |
+| `resolution/` | Exact-match cross-source entity reconciliation | Silver |
+| `temporal/` | `latest_wins` temporal record reconciliation | Silver |
+| `schema/` | Schema-contract transformation and enforcement | Silver → Gold |
 | `evidence/` | Append-only transformation artifacts | All layers |
 | `orchestration/` | Pipeline sequencing across modules | All layers |
 | `config/` | Contract and policy management | All layers |
@@ -85,10 +85,10 @@ aetheriaforge/
 1. Register dataset and forge contract
 2. Ingest source files (CSV, Parquet, JSON, Excel, XML, ORC, Avro, fixed-width)
 3. Load source data from Bronze layer
-4. Run schema enforcement against the registered contract
-5. Execute coherence-scored transformation with Shannon entropy
-6. Run entity resolution across configured source mappings
-7. Run temporal reconciliation for time-inconsistent records
+4. Execute schema-contract transformation and optional schema enforcement
+5. Score the transformed output with Shannon entropy
+6. Run optional exact-match entity resolution across configured source mappings
+7. Run optional `latest_wins` temporal reconciliation for time-inconsistent records
 8. Write forged Silver-ready output to target surface
 9. Write append-only transformation evidence
 10. Emit transformation event (if bundled mode is active)

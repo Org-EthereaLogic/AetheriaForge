@@ -24,6 +24,9 @@ def _make_policy(
     strategy: str = "exact",
     ambiguity_behavior: str = "skip",
     sources: tuple[SourceConfig, ...] | None = None,
+    *,
+    record_all_decisions: bool = True,
+    include_rejected_matches: bool = True,
 ) -> ResolutionPolicy:
     """Build a minimal ResolutionPolicy for testing."""
     if sources is None:
@@ -40,8 +43,8 @@ def _make_policy(
             confidence_threshold=0.85,
             ambiguity_behavior=ambiguity_behavior,
         ),
-        record_all_decisions=True,
-        include_rejected_matches=True,
+        record_all_decisions=record_all_decisions,
+        include_rejected_matches=include_rejected_matches,
     )
 
 
@@ -125,6 +128,33 @@ def test_exact_match_multiple_secondaries_fail() -> None:
 
     with pytest.raises(ValueError, match="Ambiguous match for key"):
         resolver.resolve(primary, secondary)
+
+
+def test_resolution_can_suppress_rejected_decisions() -> None:
+    """Rejected decisions are omitted when policy disables them."""
+    policy = _make_policy(include_rejected_matches=False)
+    resolver = EntityResolver(policy)
+
+    primary = pd.DataFrame({"entity_id": [1], "name": ["Alice"]})
+    secondary = pd.DataFrame({"entity_id": [999], "score": [50]})
+
+    result = resolver.resolve(primary, secondary)
+
+    assert result.unresolved_count == 1
+    assert result.decisions == []
+
+
+def test_resolution_records_matches_when_not_recording_all_decisions() -> None:
+    """Matched decisions still remain available when rejected ones are suppressed."""
+    policy = _make_policy(record_all_decisions=False)
+    resolver = EntityResolver(policy)
+
+    primary = pd.DataFrame({"entity_id": [1, 2], "name": ["Alice", "Bob"]})
+    secondary = pd.DataFrame({"entity_id": [1], "score": [99]})
+
+    result = resolver.resolve(primary, secondary)
+
+    assert [decision.verdict for decision in result.decisions] == ["MATCHED"]
 
 
 # --- Strategy validation tests ------------------------------------------------

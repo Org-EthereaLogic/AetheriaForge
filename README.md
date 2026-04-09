@@ -23,7 +23,7 @@ Built by Anthony Johnson | EthereaLogic LLC
 
 ---
 
-Every Medallion transformation introduces information loss. Most pipelines ignore it. AetheriaForge measures it — scoring every transformation for coherence, reconciling entities across source systems, merging temporal conflicts, and enforcing schema contracts with versioned evolution. Every operation produces append-only evidence. Nothing is assumed to have passed unless the artifact says so.
+Every Medallion transformation introduces information loss. Most pipelines ignore it. AetheriaForge measures it by transforming source records through schema contracts, scoring the result for coherence, applying optional exact-match entity resolution and latest-wins temporal reconciliation, and recording append-only evidence. Nothing is assumed to have passed unless the artifact says so.
 
 ## Executive Summary
 
@@ -83,13 +83,13 @@ Enterprises operating mature Lakehouse architectures face three transformation g
 | ------- | ------- |
 | `src/aetheriaforge/ingest/` | Enterprise file ingestion — CSV, Parquet, JSON, Excel, XML, ORC, Avro, and more |
 | `src/aetheriaforge/forge/` | Coherence-scored transformation engine (Shannon entropy v1.x) |
-| `src/aetheriaforge/resolution/` | Cross-source entity resolution with configurable matching rules |
-| `src/aetheriaforge/temporal/` | Temporal reconciliation across CDC, SCD Type 2, and batch sources |
-| `src/aetheriaforge/schema/` | Schema enforcement and versioned evolution management |
+| `src/aetheriaforge/resolution/` | Cross-source entity resolution using policy-driven exact matching in v1.x |
+| `src/aetheriaforge/temporal/` | Temporal reconciliation using deterministic `latest_wins` conflict handling in v1.x |
+| `src/aetheriaforge/schema/` | Schema-contract transformation metadata and schema enforcement with recorded contract versions |
 | `src/aetheriaforge/evidence/` | Append-only transformation artifact writing shared across all modules |
 | `src/aetheriaforge/orchestration/` | Workflow sequencing — runs all forge operations in order |
 | `src/aetheriaforge/config/` | Forge contract and policy configuration |
-| `src/aetheriaforge/integration/` | Optional DriftSentinel event emission and drift payload ingestion |
+| `src/aetheriaforge/integration/` | Optional DriftSentinel event emission and drift follow-up ingestion |
 | `app/` | Databricks App (Gradio) — four-tab read-only operator dashboard |
 | `notebooks/` | Onboarding, execution, and evidence-review notebooks for Databricks |
 | `resources/` | Databricks Asset Bundle pipeline, job, and app resource definitions |
@@ -104,9 +104,9 @@ Every directory above contains a `README.md` describing its contents, including 
 | Verified outcome | Evidence from this repository |
 | ---------------- | ----------------------------- |
 | Coherence scoring measures information loss at every transformation | Forge engine computes Shannon entropy before and after, producing a 0.0–1.0 coherence score per operation with configurable thresholds |
-| Entity resolution produces governed match evidence | Resolution module matches records across source systems using configurable key-based rules and writes match decisions to append-only artifacts |
-| Temporal reconciliation resolves conflicts with an audit trail | Temporal reconciler merges CDC, SCD Type 2, and batch records with strategy-driven conflict resolution and evidence of every merge decision |
-| Schema enforcement is contract-driven and versioned | Schema enforcer validates output against versioned YAML contracts with evolution management for added, removed, and type-changed columns |
+| Entity resolution produces governed match evidence | Resolution module matches records across source systems using configured exact key rules, policy-driven ambiguity handling, and append-only evidence |
+| Temporal reconciliation resolves conflicts with an audit trail | Temporal reconciler applies deterministic `latest_wins` selection, records duplicate-timestamp conflicts, and writes evidence for merge decisions |
+| Schema enforcement is contract-driven and versioned | Schema enforcer validates output against YAML contracts, records the applied contract version in evidence, and honors contract enforcement settings |
 | Enterprise file ingestion handles heterogeneous sources | Ingest module supports 10 formats with auto-detection, producing evidence metadata for every read operation |
 | Evidence artifacts are queryable without writing scripts | Operator dashboard surfaces all artifacts with coherence scores, verdicts, timestamps, and provenance metadata across four tabs |
 | Databricks deployment workflow is defined for a configured workspace | Asset Bundle resources and deployment docs cover validate, deploy, and app status checks; replay requires Databricks credentials and Unity Catalog |
@@ -134,10 +134,10 @@ Every directory above contains a `README.md` describing its contents, including 
 
 ## How It Works
 
-1. **Register datasets and forge contracts.** Each dataset is registered with a YAML contract specifying source location, target schema, resolution rules, temporal merge policy, and coherence thresholds. File-backed datasets use a landing path; table-backed datasets use the `catalog/schema/table` triplet.
-2. **Run the forge pipeline.** The orchestration layer runs schema enforcement, coherence-scored transformation, entity resolution, and temporal reconciliation in sequence. Each module writes an append-only evidence artifact to the shared evidence directory.
+1. **Register datasets and forge contracts.** Each dataset is registered with a YAML contract specifying source location, target schema, optional resolution rules, optional temporal merge policy, and coherence thresholds. File-backed datasets use a landing path; table-backed datasets use the `catalog/schema/table` triplet.
+2. **Run the forge pipeline.** The orchestration layer loads the source surface, performs schema-contract transformation when no forged DataFrame is supplied, applies optional schema enforcement, optional exact-match entity resolution, and optional `latest_wins` temporal reconciliation, then scores the result for coherence. Each module writes append-only evidence artifacts to the shared evidence directory.
 3. **Inspect transformation evidence.** The Forge Registry tab shows all registered datasets with contract versions and locations. The Transformation Status tab surfaces artifacts with coherence scores, verdicts, and provenance. The Evidence Explorer loads any single artifact by filename and renders the full JSON payload. The Analytics tab renders verdict distribution, coherence trends, daily volume, and health over time.
-4. **Integrate with DriftSentinel (optional).** When bundled, AetheriaForge emits transformation events that DriftSentinel can consume for smarter publication gating, and receives drift payloads for auto-remediation. When standalone, the NullEventChannel silently drops events with zero overhead.
+4. **Integrate with DriftSentinel (optional).** When bundled, AetheriaForge emits transformation events that DriftSentinel can consume for smarter publication gating, and receives drift payloads that produce evidence-backed follow-up actions. When standalone, the NullEventChannel silently drops events with zero overhead.
 
 ## Databricks Fit
 
@@ -146,6 +146,10 @@ Every directory above contains a `README.md` describing its contents, including 
 - **Unity Catalog** for governed table publication and the evidence volume backing the operator dashboard.
 - **Databricks Lakeflow / Jobs** for scheduled forge pipeline execution across registered datasets.
 - AetheriaForge is contract-driven rather than domain-hardcoded. Registered datasets can vary by schema and source system, but supported execution depends on the declared file or table format, schema contract, and the forge logic implemented in this repository.
+
+## Execution Profile
+
+v1.x execution is pandas-based. File-backed datasets and Spark/Unity Catalog tables are materialized into pandas DataFrames on the driver before transformation, resolution, temporal reconciliation, and scoring run. Real workloads therefore need to fit driver memory or be pre-filtered and partitioned upstream; this repository does not claim cluster-distributed Spark-native execution.
 
 ## Quickstart
 
@@ -157,7 +161,7 @@ The fastest way to get the AetheriaForge package into your environment:
 pip install etherealogic-aetheriaforge
 ```
 
-This installs the full AetheriaForge package — coherence-scored transformation engine, entity resolution, temporal reconciliation, schema enforcement, evidence writer, orchestration, and bundled contract and policy templates.
+This installs the full AetheriaForge package — contract-driven transformation, coherence scoring, exact-match entity resolution, `latest_wins` temporal reconciliation, schema enforcement, evidence writing, orchestration, and bundled contract and policy templates.
 
 For enterprise file ingestion (Excel, XML, ORC, Avro, Parquet):
 
@@ -296,7 +300,7 @@ AetheriaForge is the second product in the **EthereaLogic Databricks Suite** —
 | **AetheriaForge** | Transform, reconcile, forge clean data | Silver (transformation engine) |
 | EthereaLogic Suite (bundled) | Full governed Medallion pipeline | Bronze to Silver to Gold |
 
-When both products are deployed, AetheriaForge emits transformation events that DriftSentinel consumes for smarter publication gating, and DriftSentinel feeds drift payloads back for auto-remediation. Each product operates independently when the other is absent.
+When both products are deployed, AetheriaForge emits transformation events that DriftSentinel consumes for smarter publication gating, and DriftSentinel can feed drift payloads back for evidence-backed follow-up actions. Each product operates independently when the other is absent.
 
 ---
 

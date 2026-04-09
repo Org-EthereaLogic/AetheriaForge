@@ -14,7 +14,7 @@ sources:
     priority: 2
 
 matching:
-  strategy: exact  # exact | fuzzy | composite
+  strategy: exact  # v1.x supports exact only
   confidence_threshold: 0.85
   ambiguity_behavior: skip  # skip | fail | best_match
 

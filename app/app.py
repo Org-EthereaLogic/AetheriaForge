@@ -156,8 +156,16 @@ def load_registry_table(contracts_dir: str) -> list[list[str]]:
     for name in datasets:
         for version in registry.list_versions(name):
             contract = registry.get(name, version)
-            source = f"{contract.source_schema}.{contract.source_table}"
-            target = f"{contract.target_schema}.{contract.target_table}"
+            source = (
+                f"{contract.source_schema}.{contract.source_table}"
+                if contract.source_table
+                else contract.source_path
+            )
+            target = (
+                f"{contract.target_schema}.{contract.target_table}"
+                if contract.target_table
+                else contract.target_path
+            )
             rows.append([
                 name,
                 version,
@@ -281,6 +289,7 @@ def _query_evidence_records(
         "forge_result": "\u2692\ufe0f forge",
         "resolution_result": "\U0001f517 resolution",
         "temporal_result": "\u23f0 temporal",
+        "remediation_action": "\U0001f6e0\ufe0f remediation",
     }
 
     rows: list[list[str]] = []
@@ -332,6 +341,12 @@ def _query_evidence_records(
             conflicts = artifact.get("conflict_count", "")
             if reconciled != "":
                 record_str = f"{reconciled} reconciled / {conflicts} conflicts"
+
+        if not record_str and event_type == "remediation_action":
+            action_name = artifact.get("action", "")
+            drift_verdict = artifact.get("drift_gate_verdict", "")
+            if action_name:
+                record_str = f"{action_name} / {drift_verdict}"
 
         ts = (
             artifact.get("run_at")
@@ -403,6 +418,7 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
         mode = _MODE_LABELS.get(raw_mode, f"\u2753 {raw_mode}")
         source_loc = data.get("source_location", "")
         contract_ver = data.get("contract_version", "")
+        schema_ver = data.get("schema_version", "")
         parts = [
             f"**Dataset:** `{ds_name}`",
             f"**Verdict:** {verdict}",
@@ -413,6 +429,8 @@ def load_artifact_meta(evidence_dir: str, filename: str) -> str:
             parts.append(f"**Source:** `{source_loc}`")
         if contract_ver:
             parts.append(f"**Contract:** `v{contract_ver}`")
+        if schema_ver:
+            parts.append(f"**Schema:** `v{schema_ver}`")
         parts.append(f"**Timestamp:** {_fmt_timestamp(str(ts)) or chr(8212)}")
         return "  ".join(parts)
     except (json.JSONDecodeError, OSError) as exc:

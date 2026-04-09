@@ -25,23 +25,23 @@
 
 ## 3. Resolution Engine Verification
 
-- Unit tests for entity matching across configurable rules
-- Cross-source resolution: records with different IDs for the same entity merge
-- Ambiguous match handling: configurable behavior (fail, skip, best-match)
-- Resolution evidence: every match decision is recorded
+- Unit tests for entity matching across configured exact key rules
+- Cross-source resolution: records with matching configured keys merge across systems
+- Ambiguous match handling: configurable behavior (`fail`, `skip`, `best_match`)
+- Resolution evidence: recorded match decisions are written to append-only artifacts
 
 ## 4. Temporal Engine Verification
 
-- Unit tests for CDC, SCD Type 2, and batch merge logic
-- Temporal conflict detection: overlapping records produce explicit conflicts
+- Unit tests for `latest_wins` merge logic
+- Temporal conflict detection: duplicate max timestamps produce explicit conflicts
 - Merge determinism: same inputs always produce same merge result
-- Temporal evidence: merge decisions and conflict resolutions recorded
+- Temporal evidence: merge decisions and conflict reporting recorded
 
 ## 5. Schema Enforcement Verification
 
-- Unit tests for schema validation, coercion, and evolution
+- Unit tests for schema validation and coercion
 - Contract versioning: older evidence retains the contract version active at time of forging
-- Evolution: schema changes produce new contract versions, not retroactive mutation
+- Enforcement controls: configured unknown-column and null-violation behavior is honored
 - Rejection evidence: non-conformant records quarantined with explicit reasons
 
 ## 6. File Ingestion Verification
@@ -57,7 +57,7 @@
 ## 7. Integration Verification
 
 - Event emission: transformation events reach the configured channel
-- Drift ingestion: DriftSentinel payloads route into remediation workflow
+- Drift ingestion: DriftSentinel payloads route into evidence-backed follow-up actions
 - Standalone mode: integration disabled by default, no errors when DriftSentinel absent
 - Bundle resources and notebook orchestration tests
 

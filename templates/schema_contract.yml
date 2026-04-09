@@ -13,9 +13,14 @@ columns:
   - name: name
     type: string
     nullable: false
+    transforms:
+      - op: strip
   - name: amount
     type: double
     nullable: true
+    transforms:
+      - op: round
+        value: 2
   - name: event_date
     type: date
     nullable: false

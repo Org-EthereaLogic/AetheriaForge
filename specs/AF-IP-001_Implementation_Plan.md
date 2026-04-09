@@ -26,8 +26,8 @@
 
 ## Phase 2: Resolution and Temporal Engines
 
-- Implement cross-source entity resolution with configurable matching rules
-- Implement temporal reconciliation across CDC, SCD Type 2, and batch sources
+- Implement cross-source entity resolution with exact key-based matching in v1.x
+- Implement temporal reconciliation with deterministic `latest_wins` selection in v1.x
 - Wire resolution and temporal engines into the orchestration pipeline
 - Exit: multi-source records resolve and merge with evidence
 

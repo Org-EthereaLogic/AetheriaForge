@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +40,15 @@ def _df_summary(df: pd.DataFrame) -> dict[str, int]:
     return {"rows": len(df), "columns": len(df.columns)}
 
 
+def _schema_verdict(result: EnforcementResult) -> str:
+    """Map schema enforcement output to a pipeline verdict."""
+    if len(result.quarantined) == 0:
+        return "PASS"
+    if len(result.conformant) == 0:
+        return "FAIL"
+    return "WARN"
+
+
 EXECUTION_MODES = frozenset({"demo", "notebook", "contract_backed", "unverified"})
 
 
@@ -59,6 +68,17 @@ class PipelineResult:
     source_location: str = ""
     target_location: str = ""
     contract_version: str = ""
+    schema_version: str = ""
+    forged_df: pd.DataFrame | None = field(default=None, repr=False, compare=False)
+    include_forged_df: bool = False
+
+    def __post_init__(self) -> None:
+        """Avoid retaining large DataFrames unless explicitly requested."""
+        if self.forged_df is None:
+            return
+        if self.include_forged_df or self.execution_mode == "notebook":
+            return
+        self.forged_df = None
 
     def as_dict(self) -> dict[str, Any]:
         """Return the result as a dictionary with an ``event`` key."""
@@ -71,6 +91,7 @@ class PipelineResult:
             "source_location": self.source_location,
             "target_location": self.target_location,
             "contract_version": self.contract_version,
+            "schema_version": self.schema_version,
             "forge_result": self.forge_result.as_dict(),
             "evidence_path": self.evidence_path,
         }
@@ -98,7 +119,7 @@ class PipelineResult:
 
 
 class ForgePipeline:
-    """Sequences schema enforcement, forge scoring, resolution, and temporal reconciliation."""
+    """Execute transformation, enforcement, scoring, resolution, and temporal stages."""
 
     def __init__(
         self,
@@ -113,75 +134,131 @@ class ForgePipeline:
     def run(
         self,
         source_df: pd.DataFrame,
-        forged_df: pd.DataFrame,
+        forged_df: pd.DataFrame | None = None,
         schema_columns: list[ColumnSpec] | None = None,
         secondary_df: pd.DataFrame | None = None,
         resolution_policy: ResolutionPolicy | None = None,
         temporal_config: TemporalConfig | None = None,
         target_layer: str = "silver",
         execution_mode: str = "unverified",
+        include_forged_df: bool = False,
     ) -> PipelineResult:
-        """Execute the full forge pipeline and return a :class:`PipelineResult`.
-
-        Stages execute in order: schema enforcement, forge scoring, entity
-        resolution, temporal reconciliation.  Each stage is optional and
-        controlled by the provided arguments.
-
-        *execution_mode* is recorded in the evidence artifact to distinguish
-        demo, notebook, contract-backed, and unverified runs.
-        """
+        """Execute the full forge pipeline and return a :class:`PipelineResult`."""
         if execution_mode not in EXECUTION_MODES:
-            msg = f"Invalid execution_mode {execution_mode!r}; must be one of {sorted(EXECUTION_MODES)}"
+            msg = (
+                f"Invalid execution_mode {execution_mode!r}; must be one of "
+                f"{sorted(EXECUTION_MODES)}"
+            )
             raise ValueError(msg)
+
+        schema_definition = self.contract.load_schema_contract()
+        schema_version = (
+            schema_definition.version if schema_definition is not None else ""
+        )
+        if schema_columns is None and schema_definition is not None:
+            schema_columns = schema_definition.to_column_specs()
+
+        if resolution_policy is None and self.contract.resolution_enabled:
+            resolution_policy = self.contract.load_resolution_policy()
+            if resolution_policy is None:
+                msg = (
+                    "Resolution is enabled in the forge contract but no "
+                    "resolution policy is configured"
+                )
+                raise ValueError(msg)
+
+        if self.contract.resolution_enabled and secondary_df is None:
+            msg = (
+                "Resolution is enabled in the forge contract but no secondary "
+                "dataset was provided"
+            )
+            raise ValueError(msg)
+        resolved_secondary_df = secondary_df
+
+        if temporal_config is None and self.contract.temporal_enabled:
+            temporal_config = self.contract.load_temporal_config()
+            if temporal_config is None:
+                msg = (
+                    "Temporal reconciliation is enabled in the forge contract "
+                    "but the required temporal configuration is missing"
+                )
+                raise ValueError(msg)
+
         verdicts: list[str] = []
         enforcement_result: EnforcementResult | None = None
         resolution_result: ResolutionResult | None = None
         temporal_result: TemporalResult | None = None
 
-        working_source = source_df
+        engine = ForgeEngine(self.contract, evidence_writer=self.evidence_writer)
+        transformed_df = forged_df
+        if transformed_df is None:
+            if schema_definition is None:
+                msg = (
+                    "No forged_df was supplied and the forge contract does not "
+                    "reference a schema contract for transformation"
+                )
+                raise ValueError(msg)
+            transformed_df = engine.transform(source_df, schema_definition)
+        else:
+            transformed_df = transformed_df.copy()
 
-        # --- Stage 1: Schema enforcement ---
-        if schema_columns is not None:
-            enforcer = SchemaEnforcer(schema_columns, self.contract.schema_contract)
-            enforcement_result = enforcer.enforce(source_df)
-            if len(enforcement_result.quarantined) > 0:
+        working_forged = transformed_df
+
+        effective_schema_config = self.contract.schema_contract
+        if schema_definition is not None and "enforcement" in schema_definition.raw:
+            effective_schema_config = replace(
+                effective_schema_config,
+                coerce_types=schema_definition.enforcement.type_coercion,
+                unknown_columns=schema_definition.enforcement.unknown_columns,
+                null_violation=schema_definition.enforcement.null_violation,
+            )
+
+        if schema_columns is not None and effective_schema_config.enforce:
+            enforcer = SchemaEnforcer(schema_columns, effective_schema_config)
+            enforcement_result = enforcer.enforce(working_forged)
+            verdicts.append(_schema_verdict(enforcement_result))
+            working_forged = enforcement_result.conformant
+
+        if resolution_policy is not None:
+            if resolved_secondary_df is None:
+                msg = "Resolution policy was supplied without a secondary dataset"
+                raise ValueError(msg)
+            resolver = EntityResolver(
+                resolution_policy,
+                evidence_writer=self.evidence_writer,
+            )
+            resolution_result = resolver.resolve(working_forged, resolved_secondary_df)
+            if resolution_result.ambiguous_count > 0:
                 verdicts.append("WARN")
-            else:
-                verdicts.append("PASS")
-            working_source = enforcement_result.conformant
+            working_forged = pd.concat(
+                [resolution_result.resolved, resolution_result.unresolved],
+                ignore_index=True,
+                sort=False,
+            )
 
-        # --- Stage 2: Forge scoring ---
-        engine = ForgeEngine(self.contract, evidence_writer=None)
-        forge_result = engine.forge(working_source, forged_df, target_layer)
+        if temporal_config is not None:
+            reconciler = TemporalReconciler(
+                temporal_config,
+                evidence_writer=self.evidence_writer,
+            )
+            temporal_result = reconciler.reconcile(working_forged)
+            if temporal_result.conflict_count > 0:
+                verdicts.append("WARN")
+            working_forged = temporal_result.reconciled
+
+        forge_result = engine.forge(source_df, working_forged, target_layer)
         verdicts.append(forge_result.verdict)
 
-        # --- Stage 3: Entity resolution ---
-        if resolution_policy is not None and secondary_df is not None:
-            resolver = EntityResolver(resolution_policy, evidence_writer=None)
-            resolution_result = resolver.resolve(forged_df, secondary_df)
-
-        # --- Stage 4: Temporal reconciliation ---
-        if temporal_config is not None:
-            working_df: pd.DataFrame
-            if resolution_result is not None:
-                working_df = resolution_result.resolved
-            else:
-                working_df = forged_df
-            reconciler = TemporalReconciler(temporal_config, evidence_writer=None)
-            temporal_result = reconciler.reconcile(working_df)
-
-        # --- Compute pipeline verdict ---
         pipeline_verdict = _worst_verdict(*verdicts) if verdicts else "PASS"
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 
-        # Build provenance strings from the contract.
         src = self.contract
         source_loc = ".".join(
             p for p in (src.source_catalog, src.source_schema, src.source_table) if p
-        )
+        ) or src.source_path
         target_loc = ".".join(
             p for p in (src.target_catalog, src.target_schema, src.target_table) if p
-        )
+        ) or src.target_path
 
         result = PipelineResult(
             dataset_name=self.contract.dataset_name,
@@ -195,6 +272,9 @@ class ForgePipeline:
             source_location=source_loc,
             target_location=target_loc,
             contract_version=self.contract.dataset_version,
+            schema_version=schema_version,
+            forged_df=working_forged,
+            include_forged_df=include_forged_df,
         )
 
         if self.evidence_writer is not None:

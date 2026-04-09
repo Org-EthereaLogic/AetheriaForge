@@ -14,9 +14,9 @@
 | --- | --- | --- |
 | AF-SR-001 | AF-FR-001 | Single repository layout with product code, deployment assets, notebooks, specs, and agent-layer scaffolding |
 | AF-SR-002 | AF-FR-005, AF-FR-006 | First-party forge engine that transforms Bronze records into Silver-ready structures with Shannon entropy coherence scoring |
-| AF-SR-003 | AF-FR-007 | First-party entity resolution engine that normalizes identifiers across multiple source systems using configurable matching rules |
-| AF-SR-004 | AF-FR-008 | First-party temporal reconciliation engine that merges records across CDC, SCD Type 2, and batch sources with conflict detection |
-| AF-SR-005 | AF-FR-009 | Schema enforcement layer that validates, coerces, and evolves records against versioned schema contracts |
+| AF-SR-003 | AF-FR-007 | First-party entity resolution engine that normalizes identifiers across multiple source systems using configured exact key matching and ambiguity controls in v1.x |
+| AF-SR-004 | AF-FR-008 | First-party temporal reconciliation engine that applies deterministic `latest_wins` selection with duplicate-timestamp conflict detection in v1.x |
+| AF-SR-005 | AF-FR-009 | Schema enforcement layer that validates and coerces records against versioned schema contracts while recording the applied contract version |
 | AF-SR-006 | AF-FR-004 | Declarative forge registration through YAML contracts specifying source, target, schema, resolution rules, and coherence thresholds |
 | AF-SR-007 | AF-FR-011 | Downstream-safe output surface separate from raw and quarantined surfaces; explicit failure reasons preserved |
 | AF-SR-008 | AF-FR-010, AF-FR-012 | Persist coherence scores, resolution outcomes, temporal merge decisions, schema coercions, and transformation metadata as append-only evidence |
@@ -24,7 +24,7 @@
 | AF-SR-010 | AF-FR-002 | Bundle deployment path and manual import path |
 | AF-SR-011 | AF-FR-012 | Deterministic demo path for local and workspace validation |
 | AF-SR-012 | AF-FR-013 | Event emission interface publishing transformation events (coherence scores, resolution outcomes, schema versions applied) to a lightweight channel consumable by DriftSentinel |
-| AF-SR-013 | AF-FR-014 | Drift payload ingestion interface that receives drift reports from DriftSentinel and routes them into a remediation workflow |
+| AF-SR-013 | AF-FR-014 | Drift payload ingestion interface that receives drift reports from DriftSentinel and routes them into evidence-backed follow-up actions |
 | AF-SR-014 | AF-FR-015 | Pre-implementation Codacy, Codecov, and Snyk setup |
 | AF-SR-015 | AF-FR-016 | Evidence-backed Notion dashboard sync policy with payload fallback |
 | AF-SR-016 | AF-FR-018 | File ingestion module that reads CSV, TSV, Parquet, JSON, JSONL, Excel, XML, ORC, Avro, and fixed-width files into DataFrames with format detection, reader options, and optional evidence writing |

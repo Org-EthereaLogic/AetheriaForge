@@ -46,7 +46,7 @@ class TransformationEvent:
             coherence_score=result.forge_result.coherence_score,
             verdict=result.pipeline_verdict,
             resolution_outcome=resolution_outcome,
-            schema_version=contract.dataset_version,
+            schema_version=result.schema_version or contract.dataset_version,
             run_at=result.run_at,
             payload=payload,
         )

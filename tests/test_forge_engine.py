@@ -14,6 +14,7 @@ import pytest
 from aetheriaforge.config import ForgeContract
 from aetheriaforge.evidence import EvidenceWriter
 from aetheriaforge.forge import ForgeEngine, shannon_coherence_score
+from aetheriaforge.schema import SchemaContract
 
 
 def _contract_data(
@@ -134,6 +135,68 @@ def test_forge_warn_verdict() -> None:
 
     assert result.verdict == "WARN"
     assert result.failure_reason is not None
+
+
+def test_transform_and_forge_from_schema_contract(
+    contract: ForgeContract,
+) -> None:
+    """ForgeEngine can derive a forged frame from a schema contract."""
+    source = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["  alice  ", "bob"],
+            "amount": [10.124, 20.875],
+            "event_date": ["2026-01-01", "2026-01-02"],
+            "updated_at": ["2026-01-01T00:00:00", "2026-01-02T00:00:00"],
+        }
+    )
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.2.0", "layer": "silver"},
+            "columns": [
+                {"name": "id", "type": "long", "nullable": False},
+                {
+                    "name": "name",
+                    "type": "string",
+                    "nullable": False,
+                    "transforms": [{"op": "strip"}, {"op": "upper"}],
+                },
+                {
+                    "name": "amount",
+                    "type": "double",
+                    "nullable": True,
+                    "transforms": [{"op": "round", "value": 2}],
+                },
+            ],
+        }
+    )
+
+    engine = ForgeEngine(contract)
+    forged, result = engine.transform_and_forge(source, schema_contract)
+
+    assert list(forged.columns) == ["id", "name", "amount"]
+    assert forged.iloc[0]["name"] == "ALICE"
+    assert forged.iloc[0]["amount"] == 10.12
+    assert result.records_out == 2
+
+
+def test_transform_missing_required_source_raises(contract: ForgeContract) -> None:
+    """Missing non-nullable source columns fail before scoring."""
+    source = pd.DataFrame({"id": [1]})
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.0.0", "layer": "silver"},
+            "columns": [
+                {"name": "id", "type": "long", "nullable": False},
+                {"name": "name", "type": "string", "nullable": False},
+            ],
+        }
+    )
+
+    engine = ForgeEngine(contract)
+
+    with pytest.raises(ValueError, match="Missing required source column"):
+        engine.transform_and_forge(source, schema_contract)
 
 
 # --- Evidence integration tests -----------------------------------------------
