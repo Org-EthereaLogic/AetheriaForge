@@ -31,8 +31,8 @@ schema_contract:
   enforce: true
   evolution: versioned
   coerce_types: true
-  unknown_columns: ignore
-  null_violation: quarantine
+  # Configure unknown_columns and null_violation in schema_contract.yml
+  # under the schema contract's enforcement section.
 
 resolution:
   enabled: false
