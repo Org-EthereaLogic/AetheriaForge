@@ -70,7 +70,15 @@ class PipelineResult:
     contract_version: str = ""
     schema_version: str = ""
     forged_df: pd.DataFrame | None = field(default=None, repr=False, compare=False)
+    include_forged_df: bool = False
 
+    def __post_init__(self) -> None:
+        """Avoid retaining large DataFrames unless explicitly requested."""
+        if self.forged_df is None:
+            return
+        if self.include_forged_df or self.execution_mode == "notebook":
+            return
+        self.forged_df = None
     def as_dict(self) -> dict[str, Any]:
         """Return the result as a dictionary with an ``event`` key."""
         result: dict[str, Any] = {
