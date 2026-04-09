@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "etherealogic-aetheriaforge"
-version = "0.1.3"
+version = "0.1.4"
 description = "EthereaLogic Databricks Suite — Intelligent Data Transformation Engine"
 readme = "README.md"
 license = { text = "MIT" }

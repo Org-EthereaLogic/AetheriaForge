@@ -54,8 +54,13 @@ jobs:
           version = pyproject["project"]["version"]
           package_name = pyproject["project"]["name"]
           dist_dir = root / "dist"
-          dist_files = sorted(path for path in dist_dir.iterdir() if path.is_file())
-          if not dist_files:
+          distribution_files = sorted(
+              path
+              for path in dist_dir.iterdir()
+              if path.is_file()
+              and (path.suffix == ".whl" or path.name.endswith(".tar.gz"))
+          )
+          if not distribution_files:
               raise SystemExit("No built distributions found in dist/.")
           output_dir = root / ".linked-artifacts"
           output_dir.mkdir(exist_ok=True)
@@ -68,7 +73,7 @@ jobs:
               ) as response:
                   metadata = json.load(response)
               available = {entry["filename"]: entry for entry in metadata["urls"]}
-              missing = [path.name for path in dist_files if path.name not in available]
+              missing = [path.name for path in distribution_files if path.name not in available]
               if not missing:
                   break
               time.sleep(5)
@@ -78,7 +83,7 @@ jobs:
                   f"PyPI metadata did not list uploaded files for version {version}: {missing}"
               )
 
-          for path in dist_files:
+          for path in distribution_files:
               file_info = available[path.name]
               payload = {
                   "name": package_name,

@@ -43,3 +43,5 @@ def test_publish_workflow_uploads_pypi_storage_records() -> None:
     assert "artifact_url" in run
     assert "github_repository" in run
     assert "artifacts/metadata/storage-record" in run
+    assert 'path.suffix == ".whl"' in run
+    assert 'path.name.endswith(".tar.gz")' in run
