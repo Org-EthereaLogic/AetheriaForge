@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from aetheriaforge.schema.enforcer import ColumnSpec
@@ -44,6 +44,78 @@ class SchemaEnforcementPolicy:
     null_violation: str = "quarantine"
 
 
+def _column_context(column: dict[str, Any], column_index: int) -> str:
+    """Return a human-readable label for a column in error messages."""
+    if "name" in column and column["name"] is not None:
+        return f"column '{column['name']}'"
+    return f"column at index {column_index}"
+
+
+def _parse_transform_step(
+    step: Any,
+    *,
+    column_context: str,
+    step_index: int,
+) -> TransformStep:
+    """Validate and build a :class:`TransformStep` from a raw YAML entry."""
+    if not isinstance(step, dict):
+        msg = (
+            "Schema contract has invalid transform step for "
+            f"{column_context} at step index {step_index}: expected a mapping"
+        )
+        raise ValueError(msg)
+    if "op" not in step:
+        msg = (
+            "Schema contract missing required transform key 'op' for "
+            f"{column_context} at step index {step_index}"
+        )
+        raise ValueError(msg)
+    return TransformStep(
+        op=str(step["op"]),
+        value=step.get("value"),
+        sources=tuple(str(src) for src in step.get("sources", [])),
+        separator=str(step.get("separator", " ")),
+    )
+
+
+def _parse_column(column: dict[str, Any], column_index: int) -> SchemaColumn:
+    """Validate and build a :class:`SchemaColumn` from a raw YAML entry."""
+    column_context = _column_context(column, column_index)
+    transforms = tuple(
+        _parse_transform_step(
+            step,
+            column_context=column_context,
+            step_index=step_index,
+        )
+        for step_index, step in enumerate(column.get("transforms", []))
+    )
+    source = (
+        str(column["source"])
+        if "source" in column and column["source"] is not None
+        else None
+    )
+    return SchemaColumn(
+        name=str(column["name"]),
+        dtype=str(column.get("type", "string")),
+        nullable=bool(column.get("nullable", True)),
+        source=source,
+        default=column.get("default"),
+        has_default="default" in column,
+        transforms=transforms,
+    )
+
+
+def _parse_enforcement(
+    enforcement_raw: dict[str, Any],
+) -> SchemaEnforcementPolicy:
+    """Build a :class:`SchemaEnforcementPolicy` from a raw YAML mapping."""
+    return SchemaEnforcementPolicy(
+        unknown_columns=str(enforcement_raw.get("unknown_columns", "ignore")),
+        type_coercion=bool(enforcement_raw.get("type_coercion", True)),
+        null_violation=str(enforcement_raw.get("null_violation", "quarantine")),
+    )
+
+
 @dataclass(frozen=True)
 class SchemaContract:
     """Resolved schema contract for transformation and enforcement."""
@@ -73,69 +145,16 @@ class SchemaContract:
                 raise ValueError(msg)
 
         contract = data["contract"]
-        columns_raw = data["columns"]
-        enforcement_raw = data.get("enforcement", {})
-
-        columns: list[SchemaColumn] = []
-        for column_index, column in enumerate(columns_raw):
-            transforms_raw = column.get("transforms", [])
-            column_context = (
-                f"column '{column['name']}'"
-                if "name" in column and column["name"] is not None
-                else f"column at index {column_index}"
-            )
-            transforms_list: list[TransformStep] = []
-            for step_index, step in enumerate(transforms_raw):
-                if not isinstance(step, dict):
-                    msg = (
-                        "Schema contract has invalid transform step for "
-                        f"{column_context} at step index {step_index}: "
-                        "expected a mapping"
-                    )
-                    raise ValueError(msg)
-                if "op" not in step:
-                    msg = (
-                        "Schema contract missing required transform key 'op' for "
-                        f"{column_context} at step index {step_index}"
-                    )
-                    raise ValueError(msg)
-                transforms_list.append(
-                    TransformStep(
-                        op=str(step["op"]),
-                        value=step.get("value"),
-                        sources=tuple(str(src) for src in step.get("sources", [])),
-                        separator=str(step.get("separator", " ")),
-                    )
-                )
-            transforms = tuple(transforms_list)
-            columns.append(
-                SchemaColumn(
-                    name=str(column["name"]),
-                    dtype=str(column.get("type", "string")),
-                    nullable=bool(column.get("nullable", True)),
-                    source=(
-                        str(column["source"])
-                        if "source" in column and column["source"] is not None
-                        else None
-                    ),
-                    default=column.get("default"),
-                    has_default="default" in column,
-                    transforms=transforms,
-                )
-            )
-
+        columns = tuple(
+            _parse_column(column, column_index)
+            for column_index, column in enumerate(data["columns"])
+        )
         return cls(
             name=str(contract.get("name", "schema_contract")),
             version=str(contract.get("version", "0.0.0")),
             layer=str(contract.get("layer", "silver")),
-            columns=tuple(columns),
-            enforcement=SchemaEnforcementPolicy(
-                unknown_columns=str(enforcement_raw.get("unknown_columns", "ignore")),
-                type_coercion=bool(enforcement_raw.get("type_coercion", True)),
-                null_violation=str(
-                    enforcement_raw.get("null_violation", "quarantine")
-                ),
-            ),
+            columns=columns,
+            enforcement=_parse_enforcement(data.get("enforcement", {})),
             raw=data,
         )
 

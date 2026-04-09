@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from aetheriaforge.paths import repo_root
 
@@ -25,6 +25,29 @@ def _options_mapping(raw: Any, *, field_name: str) -> dict[str, Any]:
         return dict(raw)
     msg = f"Forge contract field '{field_name}' must be a mapping when provided"
     raise ValueError(msg)
+
+
+def _parse_coherence(coh: dict[str, Any]) -> CoherenceConfig:
+    """Build a :class:`CoherenceConfig` from a raw YAML mapping."""
+    thresholds = coh.get("thresholds", {})
+    return CoherenceConfig(
+        engine=coh.get("engine", "shannon"),
+        bronze_min=float(thresholds.get("bronze_min", 0.5)),
+        silver_min=float(thresholds.get("silver_min", 0.75)),
+        gold_min=float(thresholds.get("gold_min", 0.95)),
+    )
+
+
+def _parse_schema_contract_config(sc: dict[str, Any]) -> SchemaContractConfig:
+    """Build a :class:`SchemaContractConfig` from a raw YAML mapping."""
+    return SchemaContractConfig(
+        enforce=bool(sc.get("enforce", True)),
+        evolution=str(sc.get("evolution", "versioned")),
+        coerce_types=bool(sc.get("coerce_types", True)),
+        path=str(sc.get("path", "")),
+        unknown_columns=str(sc.get("unknown_columns", "ignore")),
+        null_violation=str(sc.get("null_violation", "quarantine")),
+    )
 
 
 @dataclass(frozen=True)
@@ -112,26 +135,6 @@ class ForgeContract:
         ds = data["dataset"]
         src = data["source"]
         tgt = data["target"]
-        coh = data["coherence"]
-        thresholds = coh.get("thresholds", {})
-        sc = data["schema_contract"]
-
-        coherence = CoherenceConfig(
-            engine=coh.get("engine", "shannon"),
-            bronze_min=float(thresholds.get("bronze_min", 0.5)),
-            silver_min=float(thresholds.get("silver_min", 0.75)),
-            gold_min=float(thresholds.get("gold_min", 0.95)),
-        )
-
-        schema_contract = SchemaContractConfig(
-            enforce=bool(sc.get("enforce", True)),
-            evolution=str(sc.get("evolution", "versioned")),
-            coerce_types=bool(sc.get("coerce_types", True)),
-            path=str(sc.get("path", "")),
-            unknown_columns=str(sc.get("unknown_columns", "ignore")),
-            null_violation=str(sc.get("null_violation", "quarantine")),
-        )
-
         resolution = data.get("resolution", {})
         temporal = data.get("temporal", {})
 
@@ -156,8 +159,8 @@ class ForgeContract:
                 tgt.get("options"),
                 field_name="target.options",
             ),
-            coherence=coherence,
-            schema_contract=schema_contract,
+            coherence=_parse_coherence(data["coherence"]),
+            schema_contract=_parse_schema_contract_config(data["schema_contract"]),
             resolution_enabled=bool(resolution.get("enabled", False)),
             temporal_enabled=bool(temporal.get("enabled", False)),
             loaded_from=str(loaded_from) if loaded_from is not None else "",
@@ -171,7 +174,8 @@ class ForgeContract:
             return candidate
         if self.loaded_from:
             return Path(self.loaded_from).resolve().parent / candidate
-        return repo_root() / candidate
+        root: Path = repo_root()
+        return root / candidate
 
     def load_schema_contract(self) -> SchemaContract | None:
         """Load the referenced schema contract, if one is configured."""

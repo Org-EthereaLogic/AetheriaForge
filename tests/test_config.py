@@ -298,3 +298,16 @@ def test_schema_contract_rejects_invalid_transform_shape() -> None:
                 ],
             }
         )
+
+
+def test_schema_contract_reports_index_for_nameless_column() -> None:
+    """Invalid transforms on nameless columns reference the column index."""
+    with pytest.raises(ValueError, match="column at index 0"):
+        SchemaContract.from_dict(
+            {
+                "contract": {"name": "schema", "version": "1.0.0"},
+                "columns": [
+                    {"type": "string", "transforms": ["upper"]},
+                ],
+            }
+        )

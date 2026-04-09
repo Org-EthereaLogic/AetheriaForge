@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import cast
 
 import pandas as pd
@@ -90,6 +91,173 @@ def _build_initial_series(
     raise TransformationError(msg)
 
 
+def _op_strip(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df, column, step
+    return series.astype("string").str.strip()
+
+
+def _op_lower(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df, column, step
+    return series.astype("string").str.lower()
+
+
+def _op_upper(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df, column, step
+    return series.astype("string").str.upper()
+
+
+def _op_fillna(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df, column
+    return series.fillna(step.value)
+
+
+def _op_multiply(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df
+    numeric = _numeric_series(series, op="multiply", column_name=column.name)
+    factor = _require_float_value(step, column_name=column.name)
+    return cast(pd.Series, numeric * factor)
+
+
+def _op_divide(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df
+    divisor = _require_float_value(step, column_name=column.name)
+    if divisor == 0:
+        msg = f"Transformation 'divide' cannot use zero for '{column.name}'"
+        raise TransformationError(msg)
+    numeric = _numeric_series(series, op="divide", column_name=column.name)
+    return cast(pd.Series, numeric / divisor)
+
+
+def _op_add(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df
+    numeric = _numeric_series(series, op="add", column_name=column.name)
+    addend = _require_float_value(step, column_name=column.name)
+    return cast(pd.Series, numeric + addend)
+
+
+def _op_subtract(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df
+    numeric = _numeric_series(series, op="subtract", column_name=column.name)
+    subtrahend = _require_float_value(step, column_name=column.name)
+    return cast(pd.Series, numeric - subtrahend)
+
+
+def _op_round(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    del source_df
+    numeric = _numeric_series(series, op="round", column_name=column.name)
+    digits = _require_int_value(step, column_name=column.name)
+    return cast(pd.Series, numeric.round(digits))
+
+
+def _op_concat(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    parts = [series.astype("string")]
+    for source_name in step.sources:
+        parts.append(
+            _resolve_source_series(
+                source_df,
+                source_name,
+                column_name=column.name,
+            ).astype("string")
+        )
+    combined = parts[0].fillna("")
+    for extra in parts[1:]:
+        combined = combined + step.separator + extra.fillna("")
+    return combined.str.strip()
+
+
+def _op_coalesce(
+    series: pd.Series,  # type: ignore[type-arg]
+    source_df: pd.DataFrame,
+    column: SchemaColumn,
+    step: TransformStep,
+) -> pd.Series:  # type: ignore[type-arg]
+    result = series.copy()
+    for source_name in step.sources:
+        fallback = _resolve_source_series(
+            source_df,
+            source_name,
+            column_name=column.name,
+        )
+        result = result.where(result.notna(), fallback)
+    return result
+
+
+_TransformOp = Callable[
+    [
+        "pd.Series",  # type: ignore[type-arg]
+        pd.DataFrame,
+        SchemaColumn,
+        TransformStep,
+    ],
+    "pd.Series",  # type: ignore[type-arg]
+]
+
+
+_TRANSFORM_OPS: dict[str, _TransformOp] = {
+    "strip": _op_strip,
+    "lower": _op_lower,
+    "upper": _op_upper,
+    "fillna": _op_fillna,
+    "multiply": _op_multiply,
+    "divide": _op_divide,
+    "add": _op_add,
+    "subtract": _op_subtract,
+    "round": _op_round,
+    "concat": _op_concat,
+    "coalesce": _op_coalesce,
+}
+
+
 def _apply_transform(
     series: pd.Series,  # type: ignore[type-arg]
     source_df: pd.DataFrame,
@@ -97,78 +265,11 @@ def _apply_transform(
     step: TransformStep,
 ) -> pd.Series:  # type: ignore[type-arg]
     """Apply one supported transform operation."""
-    op = step.op
-
-    if op == "strip":
-        return series.astype("string").str.strip()
-    if op == "lower":
-        return series.astype("string").str.lower()
-    if op == "upper":
-        return series.astype("string").str.upper()
-    if op == "fillna":
-        return series.fillna(step.value)
-    if op == "multiply":
-        return cast(
-            pd.Series,
-            _numeric_series(series, op=op, column_name=column.name)
-            * _require_float_value(step, column_name=column.name),
-        )
-    if op == "divide":
-        divisor = _require_float_value(step, column_name=column.name)
-        if divisor == 0:
-            msg = f"Transformation 'divide' cannot use zero for '{column.name}'"
-            raise TransformationError(msg)
-        return cast(
-            pd.Series,
-            _numeric_series(series, op=op, column_name=column.name) / divisor,
-        )
-    if op == "add":
-        return cast(
-            pd.Series,
-            _numeric_series(series, op=op, column_name=column.name)
-            + _require_float_value(step, column_name=column.name),
-        )
-    if op == "subtract":
-        return cast(
-            pd.Series,
-            _numeric_series(series, op=op, column_name=column.name)
-            - _require_float_value(step, column_name=column.name),
-        )
-    if op == "round":
-        return cast(
-            pd.Series,
-            _numeric_series(series, op=op, column_name=column.name).round(
-                _require_int_value(step, column_name=column.name)
-            ),
-        )
-    if op == "concat":
-        parts = [series.astype("string")]
-        for source_name in step.sources:
-            parts.append(
-                _resolve_source_series(
-                    source_df,
-                    source_name,
-                    column_name=column.name,
-                ).astype("string")
-            )
-        separator = step.separator
-        combined = parts[0].fillna("")
-        for extra in parts[1:]:
-            combined = combined + separator + extra.fillna("")
-        return combined.str.strip()
-    if op == "coalesce":
-        result = series.copy()
-        for source_name in step.sources:
-            fallback = _resolve_source_series(
-                source_df,
-                source_name,
-                column_name=column.name,
-            )
-            result = result.where(result.notna(), fallback)
-        return result
-
-    msg = f"Unsupported transform op '{op}' for column '{column.name}'"
-    raise TransformationError(msg)
+    handler = _TRANSFORM_OPS.get(step.op)
+    if handler is None:
+        msg = f"Unsupported transform op '{step.op}' for column '{column.name}'"
+        raise TransformationError(msg)
+    return handler(series, source_df, column, step)
 
 
 def transform_dataframe(

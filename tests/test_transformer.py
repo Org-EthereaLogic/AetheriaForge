@@ -18,17 +18,9 @@ def _schema_contract(columns: list[dict[str, object]]) -> SchemaContract:
     )
 
 
-def test_transform_dataframe_supports_multiple_operations() -> None:
-    """Transform steps cover string, numeric, concat, coalesce, default, and nullable cases."""
-    source = pd.DataFrame(
-        {
-            "name": ["  Alice  ", "Bob"],
-            "nickname": [None, "Bobby"],
-            "last": ["Smith", "Jones"],
-            "amount": [10.0, 20.0],
-            "missing_fill": [None, "provided"],
-        }
-    )
+def test_transform_dataframe_applies_string_ops() -> None:
+    """Strip, lower, and concat compose into target string columns."""
+    source = pd.DataFrame({"name": ["  Alice  ", "Bob"], "last": ["Smith", "Jones"]})
     schema = _schema_contract(
         [
             {
@@ -38,6 +30,30 @@ def test_transform_dataframe_supports_multiple_operations() -> None:
                 "source": "name",
                 "transforms": [{"op": "strip"}, {"op": "lower"}],
             },
+            {
+                "name": "full_name",
+                "type": "string",
+                "nullable": False,
+                "source": "name",
+                "transforms": [
+                    {"op": "strip"},
+                    {"op": "concat", "sources": ["last"], "separator": "-"},
+                ],
+            },
+        ]
+    )
+
+    transformed = transform_dataframe(source, schema)
+
+    assert transformed["name_clean"].tolist() == ["alice", "bob"]
+    assert transformed["full_name"].tolist() == ["Alice-Smith", "Bob-Jones"]
+
+
+def test_transform_dataframe_applies_numeric_chain() -> None:
+    """Numeric ops (multiply/divide/add/subtract/round) compose in order."""
+    source = pd.DataFrame({"amount": [10.0, 20.0]})
+    schema = _schema_contract(
+        [
             {
                 "name": "amount_calc",
                 "type": "double",
@@ -51,22 +67,31 @@ def test_transform_dataframe_supports_multiple_operations() -> None:
                     {"op": "round", "value": 1},
                 ],
             },
+        ]
+    )
+
+    transformed = transform_dataframe(source, schema)
+
+    assert transformed["amount_calc"].tolist() == [5.5, 10.5]
+
+
+def test_transform_dataframe_fills_and_coalesces_nullable_sources() -> None:
+    """Fillna, coalesce, default, and nullable columns behave independently."""
+    source = pd.DataFrame(
+        {
+            "nickname": [None, "Bobby"],
+            "last": ["Smith", "Jones"],
+            "missing_fill": [None, "provided"],
+        }
+    )
+    schema = _schema_contract(
+        [
             {
                 "name": "filled",
                 "type": "string",
                 "nullable": True,
                 "source": "missing_fill",
                 "transforms": [{"op": "fillna", "value": "fallback"}],
-            },
-            {
-                "name": "full_name",
-                "type": "string",
-                "nullable": False,
-                "source": "name",
-                "transforms": [
-                    {"op": "strip"},
-                    {"op": "concat", "sources": ["last"], "separator": "-"},
-                ],
             },
             {
                 "name": "preferred_name",
@@ -81,20 +106,13 @@ def test_transform_dataframe_supports_multiple_operations() -> None:
                 "nullable": False,
                 "default": "standard",
             },
-            {
-                "name": "optional_blank",
-                "type": "string",
-                "nullable": True,
-            },
+            {"name": "optional_blank", "type": "string", "nullable": True},
         ]
     )
 
     transformed = transform_dataframe(source, schema)
 
-    assert transformed["name_clean"].tolist() == ["alice", "bob"]
-    assert transformed["amount_calc"].tolist() == [5.5, 10.5]
     assert transformed["filled"].tolist() == ["fallback", "provided"]
-    assert transformed["full_name"].tolist() == ["Alice-Smith", "Bob-Jones"]
     assert transformed["preferred_name"].tolist() == ["Smith", "Bobby"]
     assert transformed["defaulted"].tolist() == ["standard", "standard"]
     assert transformed["optional_blank"].isna().all()
