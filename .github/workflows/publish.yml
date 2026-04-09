@@ -92,7 +92,7 @@ jobs:
                   "registry_url": "https://pypi.org",
                   "repository": package_name,
                   "artifact_url": file_info["url"],
-                  "github_repository": os.environ["GITHUB_REPOSITORY"],
+                  "github_repository": os.environ["GITHUB_REPOSITORY"].split("/", 1)[-1],
               }
               target = output_dir / f"{path.name}.json"
               target.write_text(json.dumps(payload), encoding="utf-8")

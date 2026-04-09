@@ -45,3 +45,7 @@ def test_publish_workflow_uploads_pypi_storage_records() -> None:
     assert "artifacts/metadata/storage-record" in run
     assert 'path.suffix == ".whl"' in run
     assert 'path.name.endswith(".tar.gz")' in run
+    # The storage-record endpoint rejects github_repository values that
+    # contain a "/", so the owner prefix from GITHUB_REPOSITORY must be
+    # stripped before the payload is submitted.
+    assert 'os.environ["GITHUB_REPOSITORY"].split("/", 1)[-1]' in run
