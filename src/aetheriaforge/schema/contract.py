@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -166,3 +167,45 @@ class SchemaContract:
             ColumnSpec(name=column.name, dtype=column.dtype, nullable=column.nullable)
             for column in self.columns
         ]
+
+    def lineage_sources_by_target(
+        self,
+        available_source_columns: Collection[str] | None = None,
+    ) -> dict[str, tuple[str, ...]]:
+        """Return declared source lineage for each target column.
+
+        The returned mapping uses target column names as keys and a tuple of
+        source column names that contribute information to that target.
+        Primary sources come from ``SchemaColumn.source`` when declared, or the
+        target name when the source column is passthrough. Additional sources
+        referenced by transforms such as ``concat`` or ``coalesce`` are
+        included once in declaration order.
+
+        When *available_source_columns* is provided, only source names present
+        in that collection are retained. This avoids assigning artificial
+        lineage to default-only or nullable target columns whose target name is
+        not actually present in the source frame.
+        """
+        available = (
+            set(available_source_columns)
+            if available_source_columns is not None
+            else None
+        )
+        lineage: dict[str, tuple[str, ...]] = {}
+
+        for column in self.columns:
+            sources: list[str] = []
+            primary_source = column.source or column.name
+            if available is None or primary_source in available:
+                sources.append(primary_source)
+
+            for step in column.transforms:
+                for source_name in step.sources:
+                    if available is not None and source_name not in available:
+                        continue
+                    if source_name not in sources:
+                        sources.append(source_name)
+
+            lineage[column.name] = tuple(sources)
+
+        return lineage

@@ -18,6 +18,8 @@
 ## 2. Forge Engine Verification
 
 - Unit tests for coherence scoring with Shannon entropy
+- Regression tests for schema-lineage scoring across renamed, projected, and
+  multi-source transformed columns
 - Transformation correctness: Bronze input → Silver output matches contract
 - Threshold enforcement: transformations below layer threshold produce FAIL
 - Coherence score determinism: same input always produces same score

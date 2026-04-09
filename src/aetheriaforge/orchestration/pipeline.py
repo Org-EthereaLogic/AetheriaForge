@@ -246,7 +246,12 @@ class ForgePipeline:
                 verdicts.append("WARN")
             working_forged = temporal_result.reconciled
 
-        forge_result = engine.forge(source_df, working_forged, target_layer)
+        forge_result = engine.forge(
+            source_df,
+            working_forged,
+            target_layer,
+            schema_contract=schema_definition,
+        )
         verdicts.append(forge_result.verdict)
 
         pipeline_verdict = _worst_verdict(*verdicts) if verdicts else "PASS"

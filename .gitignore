@@ -51,6 +51,7 @@ output/
 
 # Local data files (large datasets for stress testing)
 data/
+tmp/
 
 # Implementation session tracking (contains local paths)
 progress.json

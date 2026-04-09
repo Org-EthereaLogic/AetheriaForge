@@ -101,6 +101,10 @@ aetheriaforge/
 The v1.x coherence scoring engine uses Shannon entropy to measure information
 loss across transformations. Each transformation step produces a coherence
 score between 0.0 and 1.0 representing the ratio of information preserved.
+For schema-contract runs, the scorer evaluates each forged target column
+against its declared source lineage and excludes undeclared source columns from
+the denominator. Renamed targets therefore retain credit for preserved
+information, while lossy transforms such as rounding still reduce the score.
 
 Layer thresholds:
 - Bronze: tolerates higher entropy (≥ 0.5)

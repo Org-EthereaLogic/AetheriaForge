@@ -7,6 +7,9 @@ this module or anywhere else in the v1.x codebase.
 from __future__ import annotations
 
 import concurrent.futures
+import json
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import pandas as pd
 from scipy.stats import entropy as scipy_entropy
@@ -14,6 +17,7 @@ from scipy.stats import entropy as scipy_entropy
 _LARGE_OBJECT_SAMPLE_THRESHOLD = 50_000
 _NESTED_OBJECT_SAMPLE_CAP = 10_000
 _PARALLEL_COLUMN_THRESHOLD = 4
+_NULL_SENTINEL = "<AF_NULL>"
 
 
 def _has_nested_values(series: pd.Series, probe_size: int = 20) -> bool:  # type: ignore[type-arg]
@@ -58,6 +62,42 @@ def column_entropy(series: pd.Series) -> float:  # type: ignore[type-arg]
     return float(scipy_entropy(probabilities, base=2))
 
 
+def _normalize_joint_value(value: Any) -> object:
+    """Return a stable, hashable representation for joint-entropy counting."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, default=str)
+    if pd.isna(value):
+        return _NULL_SENTINEL
+    return value
+
+
+def joint_entropy(
+    df: pd.DataFrame,
+    columns: Sequence[str],
+) -> float:
+    """Compute the Shannon entropy of the joint distribution for *columns*."""
+    lineage = tuple(dict.fromkeys(columns))
+    if not lineage:
+        return 0.0
+    if len(lineage) == 1:
+        return column_entropy(df[lineage[0]])
+
+    missing = [column for column in lineage if column not in df.columns]
+    if missing:
+        msg = f"Joint entropy requires missing columns: {missing}"
+        raise KeyError(msg)
+
+    tuples = [
+        tuple(_normalize_joint_value(value) for value in row)
+        for row in df.loc[:, list(lineage)].itertuples(index=False, name=None)
+    ]
+    counts = pd.Series(tuples, dtype="object").value_counts(dropna=False)
+    if len(counts) <= 1:
+        return 0.0
+    probabilities = counts / counts.sum()
+    return float(scipy_entropy(probabilities, base=2))
+
+
 def _compute_column_entropies(df: pd.DataFrame) -> dict[str, float]:
     """Compute per-column entropies, parallelizing when there are many columns."""
     cols = list(df.columns)
@@ -73,17 +113,51 @@ def _compute_column_entropies(df: pd.DataFrame) -> dict[str, float]:
     return results
 
 
-def shannon_coherence_score(source: pd.DataFrame, forged: pd.DataFrame) -> float:
+def shannon_coherence_score(
+    source: pd.DataFrame,
+    forged: pd.DataFrame,
+    *,
+    lineage: Mapping[str, Sequence[str]] | None = None,
+) -> float:
     """Compute the information-preservation ratio between *source* and *forged*.
 
     Score semantics:
     - 1.0 = perfect preservation (no information lost)
     - 0.0 = total information loss
 
-    Columns present in *forged* but absent from *source* are ignored (they do
-    not count as loss).  Columns present in *source* but absent from *forged*
-    contribute 0 preservation.
+    Default semantics compare source and forged columns by exact name. Columns
+    present in *forged* but absent from *source* are ignored, while columns
+    present in *source* but absent from *forged* contribute 0 preservation.
+
+    When *lineage* is provided, the mapping keys are forged target columns and
+    the values are the source columns that contribute information to each
+    target. The denominator is then restricted to the declared source lineage,
+    and each target is credited against the joint entropy of its source tuple.
     """
+    if lineage is not None:
+        total_source_entropy = 0.0
+        preserved_entropy = 0.0
+
+        for target_column, source_columns in lineage.items():
+            source_lineage = tuple(dict.fromkeys(source_columns))
+            if not source_lineage:
+                continue
+            lineage_entropy = joint_entropy(source, source_lineage)
+            total_source_entropy += lineage_entropy
+
+            if target_column in forged.columns:
+                preserved_entropy += min(
+                    column_entropy(forged[target_column]),
+                    lineage_entropy,
+                )
+
+        if total_source_entropy == 0.0:
+            return 1.0
+
+        score = preserved_entropy / total_source_entropy
+        score = max(0.0, min(1.0, score))
+        return round(score, 6)
+
     source_entropies = _compute_column_entropies(source)
     total_source_entropy = sum(source_entropies.values())
 

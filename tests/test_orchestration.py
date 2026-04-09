@@ -213,6 +213,49 @@ def test_pipeline_transforms_from_inline_schema_contract() -> None:
     assert result.schema_version == "2.0.0"
 
 
+def test_pipeline_schema_lineage_scores_renamed_projected_contracts() -> None:
+    """Inline schema contracts score against declared lineage, not raw source names."""
+    contract = ForgeContract.from_dict(
+        {
+            **_contract_data(),
+            "schema_contract": {
+                "enforce": True,
+                "evolution": "versioned",
+                "coerce_types": True,
+                "contract": {
+                    "name": "pipeline_schema",
+                    "version": "2.1.0",
+                    "layer": "silver",
+                },
+                "columns": [
+                    {"name": "event_id", "type": "long", "nullable": False, "source": "id"},
+                    {
+                        "name": "category_clean",
+                        "type": "string",
+                        "nullable": True,
+                        "source": "category",
+                        "transforms": [{"op": "upper"}],
+                    },
+                ],
+                "enforcement": {
+                    "unknown_columns": "ignore",
+                    "type_coercion": True,
+                    "null_violation": "quarantine",
+                },
+            },
+        }
+    )
+    pipeline = ForgePipeline(contract)
+    source = _diverse_df(5)
+
+    result = pipeline.run(source, include_forged_df=True)
+
+    assert result.pipeline_verdict == "PASS"
+    assert result.forge_result.coherence_score == 1.0
+    assert result.forged_df is not None
+    assert list(result.forged_df.columns) == ["event_id", "category_clean"]
+
+
 def test_pipeline_skips_enforcement_when_contract_disables_it() -> None:
     """schema_contract.enforce=false disables schema enforcement entirely."""
     contract = ForgeContract.from_dict(

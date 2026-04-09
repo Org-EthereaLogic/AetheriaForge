@@ -86,6 +86,117 @@ def test_coherence_score_determinism() -> None:
     assert scores[0] == scores[1] == scores[2]
 
 
+def test_schema_lineage_credits_renamed_columns_and_ignores_projection() -> None:
+    """Schema-backed scoring follows declared lineage, not raw column names."""
+    source = pd.DataFrame(
+        {
+            "raw_id": [101, 102, 103, 104],
+            "raw_name": ["  Alice  ", "  Bob  ", "  Cara  ", "  Drew  "],
+            "ignore_me": [1, 1, 1, 1],
+        }
+    )
+    forged = pd.DataFrame(
+        {
+            "id": source["raw_id"],
+            "name_clean": source["raw_name"].str.strip(),
+        }
+    )
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.0.0", "layer": "silver"},
+            "columns": [
+                {"name": "id", "type": "long", "nullable": False, "source": "raw_id"},
+                {
+                    "name": "name_clean",
+                    "type": "string",
+                    "nullable": False,
+                    "source": "raw_name",
+                    "transforms": [{"op": "strip"}],
+                },
+            ],
+        }
+    )
+
+    default_score = shannon_coherence_score(source, forged)
+    lineage_score = shannon_coherence_score(
+        source,
+        forged,
+        lineage=schema_contract.lineage_sources_by_target(source.columns),
+    )
+
+    assert default_score == 0.0
+    assert lineage_score == 1.0
+
+
+def test_schema_lineage_penalizes_lossy_transforms_after_rename() -> None:
+    """Lineage-aware scoring still reflects entropy loss from lossy transforms."""
+    source = pd.DataFrame(
+        {
+            "raw_value": [1.11, 1.14, 1.16, 1.19, 2.11, 2.14, 2.16, 2.19],
+            "ignore_me": list(range(8)),
+        }
+    )
+    forged = pd.DataFrame({"value_rounded": source["raw_value"].round(1)})
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.0.0", "layer": "silver"},
+            "columns": [
+                {
+                    "name": "value_rounded",
+                    "type": "double",
+                    "nullable": False,
+                    "source": "raw_value",
+                    "transforms": [{"op": "round", "value": 1}],
+                }
+            ],
+        }
+    )
+
+    score = shannon_coherence_score(
+        source,
+        forged,
+        lineage=schema_contract.lineage_sources_by_target(source.columns),
+    )
+
+    assert 0.0 < score < 1.0
+
+
+def test_schema_lineage_uses_joint_entropy_for_concat_targets() -> None:
+    """Multi-source transforms are scored against the joint source lineage."""
+    source = pd.DataFrame(
+        {
+            "first": ["Alice", "Alice", "Bob", "Bob"],
+            "last": ["Jones", "Smith", "Jones", "Smith"],
+            "ignore_me": [1, 2, 3, 4],
+        }
+    )
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.0.0", "layer": "silver"},
+            "columns": [
+                {
+                    "name": "full_name",
+                    "type": "string",
+                    "nullable": False,
+                    "source": "first",
+                    "transforms": [{"op": "concat", "sources": ["last"], "separator": "|"}],
+                }
+            ],
+        }
+    )
+    forged = pd.DataFrame(
+        {"full_name": source["first"] + "|" + source["last"]}
+    )
+
+    score = shannon_coherence_score(
+        source,
+        forged,
+        lineage=schema_contract.lineage_sources_by_target(source.columns),
+    )
+
+    assert score == 1.0
+
+
 # --- Forge engine verdict tests -----------------------------------------------
 
 
@@ -178,6 +289,40 @@ def test_transform_and_forge_from_schema_contract(
     assert forged.iloc[0]["name"] == "ALICE"
     assert forged.iloc[0]["amount"] == 10.12
     assert result.records_out == 2
+
+
+def test_transform_and_forge_uses_schema_lineage_for_score(
+    contract: ForgeContract,
+) -> None:
+    """Schema-backed forge scoring handles renames and projected-out source columns."""
+    source = pd.DataFrame(
+        {
+            "raw_id": [1, 2, 3, 4],
+            "raw_name": ["  Alice  ", "Bob", "Cara", "Drew"],
+            "unused_noise": [100, 200, 300, 400],
+        }
+    )
+    schema_contract = SchemaContract.from_dict(
+        {
+            "contract": {"name": "schema", "version": "1.0.0", "layer": "silver"},
+            "columns": [
+                {"name": "id", "type": "long", "nullable": False, "source": "raw_id"},
+                {
+                    "name": "name_clean",
+                    "type": "string",
+                    "nullable": False,
+                    "source": "raw_name",
+                    "transforms": [{"op": "strip"}],
+                },
+            ],
+        }
+    )
+
+    engine = ForgeEngine(contract)
+    _, result = engine.transform_and_forge(source, schema_contract)
+
+    assert result.coherence_score == 1.0
+    assert result.verdict == "PASS"
 
 
 def test_transform_missing_required_source_raises(contract: ForgeContract) -> None:

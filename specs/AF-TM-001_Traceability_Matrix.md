@@ -14,7 +14,7 @@
 | AF-FR-002 | AF-SR-010 | PRD, SRS | databricks.yml, resources/, bundle validation |
 | AF-FR-003 | AF-SR-009 | PRD, SRS | notebooks, manual import path |
 | AF-FR-004 | AF-SR-006 | PRD, SRS | templates/, config loaders, registration notebook |
-| AF-FR-005 | AF-SR-002 | PRD, SDD | src/aetheriaforge/forge/, coherence scoring tests |
+| AF-FR-005 | AF-SR-002 | PRD, SDD | src/aetheriaforge/forge/, coherence scoring tests, schema-lineage regressions |
 | AF-FR-006 | AF-SR-002 | PRD, SDD | src/aetheriaforge/forge/, transformation tests |
 | AF-FR-007 | AF-SR-003 | PRD, SDD | src/aetheriaforge/resolution/, resolution tests |
 | AF-FR-008 | AF-SR-004 | PRD, SDD | src/aetheriaforge/temporal/, temporal tests |

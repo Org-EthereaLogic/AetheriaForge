@@ -118,7 +118,7 @@ Every directory above contains a `README.md` describing its contents, including 
 
 | KPI | Meaning |
 | --- | ------- |
-| `coherence_score` | Information preservation ratio for the transformation (0.0–1.0) |
+| `coherence_score` | Information preservation ratio for the transformation (0.0–1.0), scored against the declared schema lineage for contract-backed runs |
 | `resolution_confidence` | Match confidence for entity resolution decisions |
 | `temporal_conflicts` | Count of temporal merge conflicts detected |
 | `schema_conformance` | Percentage of records conforming to the target schema contract |
@@ -128,14 +128,14 @@ Every directory above contains a `README.md` describing its contents, including 
 
 ## Why This Pattern
 
-- **Gap 1.** Transformation quality must be measured, not assumed. Shannon entropy coherence scoring gives every operation a mathematical signal — not a boolean check, but a ratio that tells you how much information the transformation preserved relative to the source.
+- **Gap 1.** Transformation quality must be measured, not assumed. Shannon entropy coherence scoring gives every operation a mathematical signal — not a boolean check, but a ratio that tells you how much declared source information the transformation preserved relative to the target contract.
 - **Gap 2.** Entity resolution and temporal reconciliation must produce evidence. Match decisions and merge outcomes are written to the same append-only evidence directory as forge artifacts. A single dashboard surfaces all of them without special-casing any module.
 - **Gap 3.** The operator dashboard must be read-only. The Gradio app exposes no write surfaces. Evidence is queried, never edited through the UI. This keeps the audit trail clean and the deployment governance simple.
 
 ## How It Works
 
 1. **Register datasets and forge contracts.** Each dataset is registered with a YAML contract specifying source location, target schema, optional resolution rules, optional temporal merge policy, and coherence thresholds. File-backed datasets use a landing path; table-backed datasets use the `catalog/schema/table` triplet.
-2. **Run the forge pipeline.** The orchestration layer loads the source surface, performs schema-contract transformation when no forged DataFrame is supplied, applies optional schema enforcement, optional exact-match entity resolution, and optional `latest_wins` temporal reconciliation, then scores the result for coherence. Each module writes append-only evidence artifacts to the shared evidence directory.
+2. **Run the forge pipeline.** The orchestration layer loads the source surface, performs schema-contract transformation when no forged DataFrame is supplied, applies optional schema enforcement, optional exact-match entity resolution, and optional `latest_wins` temporal reconciliation, then scores the result for coherence. For schema-backed runs, coherence is measured against the contract's declared source lineage so column renames, multi-source derivations, and intentional projection are scored against the intended target shape rather than raw by-name overlap. Each module writes append-only evidence artifacts to the shared evidence directory.
 3. **Inspect transformation evidence.** The Forge Registry tab shows all registered datasets with contract versions and locations. The Transformation Status tab surfaces artifacts with coherence scores, verdicts, and provenance. The Evidence Explorer loads any single artifact by filename and renders the full JSON payload. The Analytics tab renders verdict distribution, coherence trends, daily volume, and health over time.
 4. **Integrate with DriftSentinel (optional).** When bundled, AetheriaForge emits transformation events that DriftSentinel can consume for smarter publication gating, and receives drift payloads that produce evidence-backed follow-up actions. When standalone, the NullEventChannel silently drops events with zero overhead.
 

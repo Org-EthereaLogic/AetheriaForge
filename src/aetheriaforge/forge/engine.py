@@ -72,10 +72,15 @@ class ForgeEngine:
         source: pd.DataFrame,
         forged: pd.DataFrame,
         target_layer: str = "silver",
+        *,
+        schema_contract: SchemaContract | None = None,
     ) -> ForgeResult:
         """Score a transformation and return a :class:`ForgeResult`."""
         threshold = self.contract.threshold_for_layer(target_layer)
-        score = shannon_coherence_score(source, forged)
+        lineage = None
+        if schema_contract is not None:
+            lineage = schema_contract.lineage_sources_by_target(source.columns)
+        score = shannon_coherence_score(source, forged, lineage=lineage)
         now_utc = datetime.now(tz=timezone.utc).isoformat()
 
         verdict: str
@@ -131,4 +136,9 @@ class ForgeEngine:
     ) -> tuple[pd.DataFrame, ForgeResult]:
         """Transform *source* via the schema contract and score the outcome."""
         forged = self.transform(source, schema_contract)
-        return forged, self.forge(source, forged, target_layer=target_layer)
+        return forged, self.forge(
+            source,
+            forged,
+            target_layer=target_layer,
+            schema_contract=schema_contract,
+        )
