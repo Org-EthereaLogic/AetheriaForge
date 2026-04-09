@@ -77,17 +77,37 @@ class SchemaContract:
         enforcement_raw = data.get("enforcement", {})
 
         columns: list[SchemaColumn] = []
-        for column in columns_raw:
+        for column_index, column in enumerate(columns_raw):
             transforms_raw = column.get("transforms", [])
-            transforms = tuple(
-                TransformStep(
-                    op=str(step["op"]),
-                    value=step.get("value"),
-                    sources=tuple(str(src) for src in step.get("sources", [])),
-                    separator=str(step.get("separator", " ")),
-                )
-                for step in transforms_raw
+            column_context = (
+                f"column '{column['name']}'"
+                if "name" in column and column["name"] is not None
+                else f"column at index {column_index}"
             )
+            transforms_list: list[TransformStep] = []
+            for step_index, step in enumerate(transforms_raw):
+                if not isinstance(step, dict):
+                    msg = (
+                        "Schema contract has invalid transform step for "
+                        f"{column_context} at step index {step_index}: "
+                        "expected a mapping"
+                    )
+                    raise ValueError(msg)
+                if "op" not in step:
+                    msg = (
+                        "Schema contract missing required transform key 'op' for "
+                        f"{column_context} at step index {step_index}"
+                    )
+                    raise ValueError(msg)
+                transforms_list.append(
+                    TransformStep(
+                        op=str(step["op"]),
+                        value=step.get("value"),
+                        sources=tuple(str(src) for src in step.get("sources", [])),
+                        separator=str(step.get("separator", " ")),
+                    )
+                )
+            transforms = tuple(transforms_list)
             columns.append(
                 SchemaColumn(
                     name=str(column["name"]),
