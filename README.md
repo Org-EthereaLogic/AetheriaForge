@@ -181,10 +181,41 @@ make sync   # installs runtime + dev dependencies via uv
 make test   # runs the pytest suite
 ```
 
-### Databricks Bundle and App Deployment
+### Databricks Bootstrap (Recommended)
+
+The fastest path from zero to a running AetheriaForge deployment:
 
 ```bash
-# First prove the catalog exists for your profile.
+# Authenticate once (OAuth U2M)
+databricks auth login --host <workspace-url>
+
+# Bootstrap: verify auth, deploy bundle, create volume, upload templates,
+# start app, and trigger the forge job — all in one command.
+make bootstrap CATALOG=my_catalog PROFILE=<profile>
+
+# With the NYC taxi sample dataset:
+make bootstrap CATALOG=my_catalog PROFILE=<profile> SAMPLE=nyctaxi
+
+# With a non-default schema or runtime volume:
+make bootstrap CATALOG=my_catalog PROFILE=<profile> SCHEMA=ops VOLUME=af_runtime
+```
+
+Requires `databricks-sdk` — install with `uv sync --group databricks`.
+
+The bootstrap script uses Databricks unified auth and the SDK to verify
+catalog access, deploy the Asset Bundle (which creates the runtime volume
+automatically), upload contract templates to the volume, start the
+Databricks App, and optionally trigger the forge job. It prints the app
+URL, evidence path, and target table when done.
+
+### Manual Databricks Deployment
+
+For incremental deploys or step-by-step control. Pass `SCHEMA` and `VOLUME`
+when you are not using the bundle defaults (`default` and
+`aetheriaforge_runtime`):
+
+```bash
+# Prove the catalog exists for your profile.
 make bundle-catalog-check CATALOG=my_catalog PROFILE=<profile>
 
 # Validate bundle wiring against that catalog.
@@ -192,17 +223,6 @@ make bundle-validate CATALOG=my_catalog PROFILE=<profile>
 
 # Deploy bundle resources and start the Databricks App.
 make app-deploy CATALOG=my_catalog PROFILE=<profile>
-```
-
-Direct CLI path:
-
-```bash
-databricks catalogs get my_catalog -p <profile>
-databricks bundle validate -p <profile> --target dev --var="catalog=my_catalog"
-databricks bundle deploy -p <profile> --target dev --var="catalog=my_catalog"
-databricks apps start aetheriaforge -p <profile>
-databricks apps deploy -p <profile> --target dev --var="catalog=my_catalog"
-databricks apps get aetheriaforge -p <profile> -o json
 ```
 
 `bundle validate` proves bundle, auth, and resource resolution. `databricks apps get` is the proof surface for `SUCCEEDED` plus `RUNNING`.

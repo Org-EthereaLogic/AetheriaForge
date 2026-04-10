@@ -26,12 +26,28 @@ def _run(
         raise subprocess.CalledProcessError(proc.returncode, cmd, proc.stdout, proc.stderr)
     if capture_json:
         assert proc.stdout
-        return json.loads(proc.stdout)
+        parsed = json.loads(proc.stdout)
+        if not isinstance(parsed, dict):
+            raise SystemExit("Expected Databricks CLI JSON output to be an object")
+        return parsed
     return proc
 
 
-def _bundle_flag_args(profile: str | None, target: str, catalog: str) -> list[str]:
-    args = ["--target", target, f"--var=catalog={catalog}"]
+def _bundle_flag_args(
+    profile: str | None,
+    target: str,
+    catalog: str,
+    *,
+    schema: str,
+    volume: str,
+) -> list[str]:
+    args = [
+        "--target",
+        target,
+        f"--var=catalog={catalog}",
+        f"--var=schema={schema}",
+        f"--var=runtime_volume={volume}",
+    ]
     if profile:
         args = ["-p", profile, *args]
     return args
@@ -113,12 +129,20 @@ def _wait_for_deployment(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", required=True)
+    parser.add_argument("--schema", default="default")
+    parser.add_argument("--volume", default="aetheriaforge_runtime")
     parser.add_argument("--target", default="dev")
     parser.add_argument("--profile")
     parser.add_argument("--app-key", default="aetheriaforge_app")
     args = parser.parse_args()
 
-    bundle_args = _bundle_flag_args(args.profile, args.target, args.catalog)
+    bundle_args = _bundle_flag_args(
+        args.profile,
+        args.target,
+        args.catalog,
+        schema=args.schema,
+        volume=args.volume,
+    )
 
     _run(["databricks", "bundle", "deploy", *bundle_args])
 
@@ -126,7 +150,7 @@ def main() -> int:
         ["databricks", "bundle", "summary", *bundle_args, "-o", "json"],
         capture_json=True,
     )
-    assert summary is not None
+    assert isinstance(summary, dict)
 
     apps = summary.get("resources", {}).get("apps", {})
     if args.app_key not in apps:

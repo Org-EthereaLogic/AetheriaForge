@@ -28,8 +28,9 @@ When prior repository patterns conflict, use this precedence:
 | `make test` | Run the pytest suite |
 | `make coverage` | Run tests with coverage reporting |
 | `make bundle-catalog-check CATALOG=<catalog> [PROFILE=<profile>]` | Prove the selected Unity Catalog catalog exists for the current Databricks auth context |
-| `make bundle-validate CATALOG=<catalog> [PROFILE=<profile>]` | Validate the Databricks Asset Bundle against an explicit catalog input |
-| `make app-deploy CATALOG=<catalog> [PROFILE=<profile>]` | Deploy the AetheriaForge Databricks App from bundle-uploaded source |
+| `make bundle-validate CATALOG=<catalog> [PROFILE=<profile>] [SCHEMA=<schema>] [VOLUME=<volume>]` | Validate the Databricks Asset Bundle against explicit catalog/schema/volume inputs |
+| `make app-deploy CATALOG=<catalog> [PROFILE=<profile>] [SCHEMA=<schema>] [VOLUME=<volume>]` | Deploy the AetheriaForge Databricks App from bundle-uploaded source |
+| `make bootstrap CATALOG=<catalog> [PROFILE=<profile>] [SCHEMA=<schema>] [VOLUME=<volume>] [SAMPLE=nyctaxi]` | One-command Databricks onboarding: verify auth, deploy bundle, create volume, upload templates, start app |
 
 ### Core Workflow Commands (21 total)
 

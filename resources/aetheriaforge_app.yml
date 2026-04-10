@@ -3,11 +3,18 @@ resources:
     aetheriaforge_app:
       name: aetheriaforge
       description: AetheriaForge operator dashboard for forge registry and evidence review
-      source_code_path: ..
+      source_code_path: ../app
+      resources:
+        - name: aetheriaforge-runtime-volume
+          description: Shared runtime volume for contracts and evidence
+          uc_securable:
+            permission: READ_VOLUME
+            securable_type: VOLUME
+            securable_full_name: "${var.catalog}.${var.schema}.${var.runtime_volume}"
       config:
         command:
           - gradio
-          - app/app.py
+          - app.py
         env:
           - name: CONTRACTS_DIR
             value: ${var.contracts_dir}

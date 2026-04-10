@@ -1,0 +1,431 @@
+"""Bootstrap AetheriaForge into a Databricks workspace.
+
+Authenticates via Databricks unified auth, verifies the catalog and schema,
+deploys the Asset Bundle (which creates the runtime volume), uploads
+contract and schema templates into the volume, starts the Databricks App,
+and optionally triggers the forge job.
+
+Usage:
+    uv run python scripts/bootstrap_databricks.py \
+        --catalog adb_dev --profile e62-trial
+
+    uv run python scripts/bootstrap_databricks.py \
+        --catalog adb_dev --profile e62-trial --sample nyctaxi
+"""
+
+from __future__ import annotations
+
+import argparse
+import io
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_TEMPLATES_DIR = _REPO_ROOT / "templates"
+_BUNDLE_APP_NAME = "aetheriaforge"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _banner(msg: str) -> None:
+    width = max(len(msg) + 4, 60)
+    print(f"\n{'=' * width}")
+    print(f"  {msg}")
+    print(f"{'=' * width}\n")
+
+
+def _step(n: int, msg: str) -> None:
+    print(f"[{n}] {msg}")
+
+
+def _run_cli(
+    cmd: list[str],
+    *,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    """Run a CLI command, stream output, and return the result."""
+    print(f"  + {' '.join(cmd)}")
+    proc = subprocess.run(cmd, text=True, capture_output=True)
+    if proc.stdout:
+        for line in proc.stdout.strip().splitlines():
+            print(f"    {line}")
+    if proc.stderr:
+        for line in proc.stderr.strip().splitlines():
+            print(f"    [stderr] {line}", file=sys.stderr)
+    if check and proc.returncode != 0:
+        raise subprocess.CalledProcessError(
+            proc.returncode, cmd, proc.stdout, proc.stderr
+        )
+    return proc
+
+
+# ---------------------------------------------------------------------------
+# SDK wrappers
+# ---------------------------------------------------------------------------
+
+
+def _get_workspace_client(profile: str | None) -> Any:
+    """Create a WorkspaceClient using Databricks unified auth."""
+    try:
+        from databricks.sdk import WorkspaceClient
+    except ImportError:
+        print(
+            "error: databricks-sdk is required for bootstrap.\n"
+            "Install it with: uv sync --group databricks"
+        )
+        sys.exit(1)
+
+    if profile:
+        return WorkspaceClient(profile=profile)
+    return WorkspaceClient()
+
+
+def _verify_auth(w: Any) -> str:
+    """Verify authentication and return the username."""
+    me = w.current_user.me()
+    user = me.user_name or me.display_name or "unknown"
+    print(f"  Authenticated as: {user}")
+    return str(user)
+
+
+def _verify_catalog(w: Any, catalog: str) -> None:
+    """Verify the Unity Catalog catalog is reachable."""
+    cat = w.catalogs.get(catalog)
+    print(f"  Catalog: {cat.name}")
+
+
+def _verify_schema(w: Any, catalog: str, schema: str) -> None:
+    """Verify the schema exists in the catalog."""
+    full_name = f"{catalog}.{schema}"
+    sch = w.schemas.get(full_name)
+    print(f"  Schema:  {sch.full_name}")
+
+
+def _verify_sample_table(w: Any, sample: str) -> str:
+    """Check the sample table exists and return its full name."""
+    table_map = {
+        "nyctaxi": "samples.nyctaxi.trips",
+    }
+    full_name = table_map.get(sample, "")
+    if not full_name:
+        print(f"  Unknown sample: {sample}")
+        sys.exit(1)
+    try:
+        info = w.tables.get(full_name)
+        print(f"  Sample table: {info.full_name} ({info.table_type})")
+    except Exception as exc:
+        print(f"  Sample table {full_name} not available: {exc}")
+        print("  Provide a source table override in the forge contract instead.")
+        sys.exit(1)
+    return full_name
+
+
+def _upload_templates(
+    w: Any,
+    volume_path: str,
+    *,
+    sample: str | None,
+    catalog: str,
+    schema: str,
+) -> None:
+    """Upload contract and schema templates to the volume contracts dir."""
+    contracts_path = f"{volume_path}/contracts"
+    uploaded = 0
+    for template_file in sorted(_TEMPLATES_DIR.glob("*.yml")):
+        target = f"{contracts_path}/{template_file.name}"
+        content = template_file.read_bytes()
+
+        if sample == "nyctaxi" and template_file.name == "forge_contract.yml":
+            content = _nyctaxi_contract(catalog, schema).encode("utf-8")
+
+        w.files.upload(target, io.BytesIO(content), overwrite=True)
+        print(f"    {template_file.name} -> {target}")
+        uploaded += 1
+    print(f"  {uploaded} template(s) uploaded")
+
+
+def _nyctaxi_contract(catalog: str, schema: str) -> str:
+    """Return a forge contract YAML customised for the NYC taxi sample."""
+    return f"""\
+# AetheriaForge — NYC Taxi Sample Contract
+# Auto-generated by bootstrap_databricks.py
+
+dataset:
+  name: nyctaxi_trips
+  version: "1.0.0"
+
+source:
+  catalog: samples
+  schema: nyctaxi
+  table: trips
+
+target:
+  catalog: {catalog}
+  schema: {schema}
+  table: nyctaxi_forged
+
+coherence:
+  engine: shannon
+  thresholds:
+    bronze_min: 0.5
+    silver_min: 0.75
+    gold_min: 0.95
+
+schema_contract:
+  enforce: false
+
+resolution:
+  enabled: false
+
+temporal:
+  enabled: false
+
+integration:
+  enabled: false
+"""
+
+
+# ---------------------------------------------------------------------------
+# Bundle + App orchestration
+# ---------------------------------------------------------------------------
+
+
+def _bundle_var_args(
+    catalog: str,
+    *,
+    schema: str,
+    volume: str,
+    contract_path: str = "",
+) -> list[str]:
+    """Build bundle variable arguments for the selected deployment surface."""
+    args = [
+        f"--var=catalog={catalog}",
+        f"--var=schema={schema}",
+        f"--var=runtime_volume={volume}",
+    ]
+    if contract_path:
+        args.append(f"--var=contract_path={contract_path}")
+    return args
+
+
+def _bundle_deploy(
+    profile: str | None,
+    target: str,
+    catalog: str,
+    *,
+    schema: str,
+    volume: str,
+) -> None:
+    """Run databricks bundle deploy."""
+    cmd = [
+        "databricks",
+        "bundle",
+        "deploy",
+        "--target",
+        target,
+        *_bundle_var_args(catalog, schema=schema, volume=volume),
+    ]
+    if profile:
+        cmd.extend(["-p", profile])
+    _run_cli(cmd)
+
+
+def _app_start(profile: str | None) -> None:
+    """Start the Databricks App."""
+    cmd = ["databricks", "apps", "start", _BUNDLE_APP_NAME]
+    if profile:
+        cmd.extend(["-p", profile])
+    _run_cli(cmd, check=False)
+
+
+def _app_deploy(
+    profile: str | None,
+    target: str,
+    catalog: str,
+    *,
+    schema: str,
+    volume: str,
+) -> None:
+    """Deploy the Databricks App via bundle."""
+    cmd = [
+        "databricks",
+        "apps",
+        "deploy",
+        _BUNDLE_APP_NAME,
+        "--target",
+        target,
+        *_bundle_var_args(catalog, schema=schema, volume=volume),
+    ]
+    if profile:
+        cmd.extend(["-p", profile])
+    _run_cli(cmd, check=False)
+
+
+def _wait_app_running(
+    w: Any, *, timeout_s: int = 600,
+) -> dict[str, Any]:
+    """Poll until the app reports RUNNING or timeout."""
+    deadline = time.time() + timeout_s
+    last_state = ""
+    while time.time() < deadline:
+        app = w.apps.get(_BUNDLE_APP_NAME)
+        state = ""
+        if hasattr(app, "app_status") and app.app_status:
+            state = str(getattr(app.app_status, "state", ""))
+        if state == "RUNNING":
+            url = getattr(app, "url", None) or ""
+            print(f"  App is RUNNING: {url}")
+            return {"url": url, "state": state}
+        if state != last_state:
+            print(f"  App state: {state}")
+            last_state = state
+        time.sleep(5)
+    print("  Timed out waiting for app to reach RUNNING state.")
+    return {"url": "", "state": last_state}
+
+
+def _trigger_job(
+    profile: str | None,
+    target: str,
+    catalog: str,
+    *,
+    schema: str,
+    volume: str,
+    contract_path: str = "",
+) -> None:
+    """Trigger the forge job via bundle run."""
+    cmd = [
+        "databricks",
+        "bundle",
+        "run",
+        "forge_job",
+        "--target",
+        target,
+        *_bundle_var_args(
+            catalog,
+            schema=schema,
+            volume=volume,
+            contract_path=contract_path,
+        ),
+    ]
+    if profile:
+        cmd.extend(["-p", profile])
+    _run_cli(cmd, check=False)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Bootstrap AetheriaForge into a Databricks workspace",
+    )
+    parser.add_argument("--catalog", required=True, help="Unity Catalog catalog name")
+    parser.add_argument("--schema", default="default", help="Unity Catalog schema name")
+    parser.add_argument("--profile", help="Databricks CLI profile name")
+    parser.add_argument(
+        "--sample",
+        choices=["nyctaxi"],
+        help="Sample dataset to use for the forge contract",
+    )
+    parser.add_argument(
+        "--volume", default="aetheriaforge_runtime",
+        help="Unity Catalog volume name (must match bundle runtime_volume variable)",
+    )
+    parser.add_argument("--target", default="dev", help="Bundle deployment target")
+    parser.add_argument(
+        "--skip-job", action="store_true", help="Skip forge job trigger after deploy",
+    )
+    args = parser.parse_args()
+
+    _banner("AetheriaForge Databricks Bootstrap")
+
+    # ---- Step 1: Verify auth -------------------------------------------------
+    _step(1, "Verifying Databricks authentication...")
+    w = _get_workspace_client(args.profile)
+    _verify_auth(w)
+
+    # ---- Step 2: Verify catalog and schema -----------------------------------
+    _step(2, "Verifying Unity Catalog access...")
+    _verify_catalog(w, args.catalog)
+    _verify_schema(w, args.catalog, args.schema)
+
+    # ---- Step 3: Verify sample table (if requested) --------------------------
+    if args.sample:
+        _step(3, f"Verifying sample table ({args.sample})...")
+        _verify_sample_table(w, args.sample)
+    else:
+        _step(3, "No sample requested, skipping sample table check.")
+
+    # ---- Step 4: Deploy bundle (creates volume) ------------------------------
+    _step(4, "Deploying Databricks Asset Bundle...")
+    _bundle_deploy(
+        args.profile,
+        args.target,
+        args.catalog,
+        schema=args.schema,
+        volume=args.volume,
+    )
+
+    # ---- Step 5: Upload templates to volume ----------------------------------
+    volume_path = f"/Volumes/{args.catalog}/{args.schema}/{args.volume}"
+    _step(5, f"Uploading templates to {volume_path}/contracts ...")
+    _upload_templates(
+        w,
+        volume_path,
+        sample=args.sample,
+        catalog=args.catalog,
+        schema=args.schema,
+    )
+
+    # ---- Step 6: Start app ---------------------------------------------------
+    _step(6, "Starting Databricks App...")
+    _app_start(args.profile)
+    app_info = _wait_app_running(w)
+
+    # ---- Step 7: Trigger job (optional) --------------------------------------
+    contract_volume_path = ""
+    if args.sample:
+        contract_volume_path = f"{volume_path}/contracts/forge_contract.yml"
+    if args.skip_job:
+        _step(7, "Skipping forge job trigger (--skip-job).")
+    else:
+        _step(7, "Triggering forge job...")
+        _trigger_job(
+            args.profile,
+            args.target,
+            args.catalog,
+            schema=args.schema,
+            volume=args.volume,
+            contract_path=contract_volume_path,
+        )
+
+    # ---- Summary -------------------------------------------------------------
+    evidence_path = f"{volume_path}/evidence"
+    contracts_path = f"{volume_path}/contracts"
+
+    _banner("Bootstrap Complete")
+    print(f"  Catalog:       {args.catalog}")
+    print(f"  Schema:        {args.schema}")
+    print(f"  Contracts:     {contracts_path}")
+    print(f"  Evidence:      {evidence_path}")
+    if app_info.get("url"):
+        print(f"  App URL:       {app_info['url']}")
+    else:
+        print("  App URL:       (check with: databricks apps get aetheriaforge -o json)")
+    if args.sample:
+        target_table = f"{args.catalog}.{args.schema}.nyctaxi_forged"
+        print(f"  Target table:  {target_table}")
+    print()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

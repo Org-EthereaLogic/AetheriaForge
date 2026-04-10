@@ -1,9 +1,7 @@
 command:
   - gradio
-  - app/app.py
+  - app.py
 
-env:
-  - name: CONTRACTS_DIR
-    value: /Volumes/adb_dev/default/aetheriaforge_runtime/contracts
-  - name: EVIDENCE_DIR
-    value: /Volumes/adb_dev/default/aetheriaforge_runtime/evidence
+# When deployed via the bundle, env vars CONTRACTS_DIR and EVIDENCE_DIR are
+# injected by the app resource definition in resources/aetheriaforge_app.yml.
+# When running locally, the app falls back to ~/.aetheriaforge/ defaults.

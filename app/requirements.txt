@@ -1,5 +1,5 @@
-# Databricks Apps installs from the snapshot of the bundle-uploaded source.
-# The "." reference resolves to the bundle root where pyproject.toml lives.
-.
+# Databricks Apps installs from the snapshot of the bundle-uploaded app/ dir.
+# The package is pulled from PyPI so the app source stays under the 10 MB limit.
+etherealogic-aetheriaforge
 gradio>=6.10.0,<7
 plotly>=5.0,<6

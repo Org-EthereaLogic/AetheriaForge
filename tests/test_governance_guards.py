@@ -89,6 +89,13 @@ def test_forge_job_references_notebook() -> None:
     assert "${var.evidence_dir}" in raw
 
 
+def test_app_resource_uses_supported_uc_securable_permission_field() -> None:
+    """App resource wiring must match the Databricks bundle schema."""
+    raw = (ROOT / "resources" / "aetheriaforge_app.yml").read_text(encoding="utf-8")
+    assert "permission:" in raw
+    assert "privilege:" not in raw
+
+
 def test_bundle_variables_include_contract_path_and_evidence_dir() -> None:
     """Bundle variables must include contract_path and evidence_dir."""
     config_path = ROOT / "databricks.yml"

@@ -2,7 +2,7 @@ UV ?= uv
 DATABRICKS ?= databricks
 PROFILE_ARG := $(if $(PROFILE),-p $(PROFILE),)
 
-.PHONY: sync lint typecheck test coverage bundle-catalog-check bundle-validate app-deploy
+.PHONY: sync lint typecheck test coverage bundle-catalog-check bundle-validate app-deploy bootstrap
 
 sync:
 	$(UV) sync --all-groups
@@ -23,7 +23,15 @@ bundle-catalog-check:
 	$(DATABRICKS) catalogs get "$${CATALOG:?Set CATALOG}" $(PROFILE_ARG) -o json
 
 bundle-validate:
-	$(DATABRICKS) bundle validate $(PROFILE_ARG) --target dev --var="catalog=$${BUNDLE_VAR_catalog:-$${CATALOG:?Set CATALOG or BUNDLE_VAR_catalog}}"
+	$(DATABRICKS) bundle validate $(PROFILE_ARG) --target dev --var="catalog=$${BUNDLE_VAR_catalog:-$${CATALOG:?Set CATALOG or BUNDLE_VAR_catalog}}" $(if $(SCHEMA),--var="schema=$(SCHEMA)",) $(if $(VOLUME),--var="runtime_volume=$(VOLUME)",)
 
 app-deploy:
-	$(UV) run python scripts/deploy_databricks_app.py $(if $(PROFILE),--profile $(PROFILE),) --target dev --catalog "$${BUNDLE_VAR_catalog:-$${CATALOG:?Set CATALOG or BUNDLE_VAR_catalog}}"
+	$(UV) run python scripts/deploy_databricks_app.py $(if $(PROFILE),--profile $(PROFILE),) --target dev --catalog "$${BUNDLE_VAR_catalog:-$${CATALOG:?Set CATALOG or BUNDLE_VAR_catalog}}" $(if $(SCHEMA),--schema $(SCHEMA),) $(if $(VOLUME),--volume $(VOLUME),)
+
+bootstrap:
+	$(UV) run --group databricks python scripts/bootstrap_databricks.py \
+		--catalog "$${BUNDLE_VAR_catalog:-$${CATALOG:?Set CATALOG or BUNDLE_VAR_catalog}}" \
+		$(if $(SCHEMA),--schema $(SCHEMA),) \
+		$(if $(VOLUME),--volume $(VOLUME),) \
+		$(if $(PROFILE),--profile $(PROFILE),) \
+		$(if $(SAMPLE),--sample $(SAMPLE),)

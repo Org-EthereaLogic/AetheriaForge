@@ -1,0 +1,7 @@
+resources:
+  volumes:
+    aetheriaforge_runtime:
+      catalog_name: ${var.catalog}
+      schema_name: ${var.schema}
+      name: ${var.runtime_volume}
+      volume_type: MANAGED

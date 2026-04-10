@@ -54,7 +54,7 @@ _MODE_LABELS = {
     "unverified": "\u2753 unverified",
 }
 
-_ASSETS = Path(__file__).parent.parent / "assets" / "aetheriaforge-brand-system"
+_BRAND_DIR = Path(__file__).parent / "brand"
 
 
 def _get_logo_uris() -> tuple[str | None, str | None]:
@@ -67,8 +67,8 @@ def _get_logo_uris() -> tuple[str | None, str | None]:
         return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
 
     return (
-        _b64(_ASSETS / "variants" / "logo-light.png"),
-        _b64(_ASSETS / "variants" / "logo-dark.png"),
+        _b64(_BRAND_DIR / "logo-light.png"),
+        _b64(_BRAND_DIR / "logo-dark.png"),
     )
 
 
