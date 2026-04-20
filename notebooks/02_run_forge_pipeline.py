@@ -247,7 +247,19 @@ def _resolve_event_channel():
 
 _execution_mode: str
 
-if contract.source_table and catalog.strip():
+if contract.source_table and contract.source_catalog and contract.source_schema:
+    # Contract explicitly declares source surface; widget catalog/schema are
+    # intended for the target, not the source. Use contract values as-is so
+    # that cross-catalog reads (e.g. samples.nyctaxi.trips → adb_dev.default.*)
+    # work when the widget specifies the target catalog/schema.
+    source_df = _load_surface(
+        label="source dataset",
+        table_name=contract.source_table,
+        catalog_name=contract.source_catalog,
+        schema_name=contract.source_schema,
+    )
+    _execution_mode = "contract_backed"
+elif contract.source_table and catalog.strip():
     source_catalog = catalog.strip() or contract.source_catalog
     source_schema = schema.strip() or contract.source_schema
     source_df = _load_surface(
@@ -255,14 +267,6 @@ if contract.source_table and catalog.strip():
         table_name=contract.source_table,
         catalog_name=source_catalog,
         schema_name=source_schema,
-    )
-    _execution_mode = "contract_backed"
-elif contract.source_table and contract.source_catalog and contract.source_schema:
-    source_df = _load_surface(
-        label="source dataset",
-        table_name=contract.source_table,
-        catalog_name=contract.source_catalog,
-        schema_name=contract.source_schema,
     )
     _execution_mode = "contract_backed"
 elif contract.source_path:
