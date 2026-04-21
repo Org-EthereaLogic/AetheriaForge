@@ -39,6 +39,12 @@ def test_publish_workflow_uploads_pypi_storage_records() -> None:
         for step in steps
         if step.get("name") == "Upload PyPI storage records to GitHub linked artifacts"
     )
+    # The GitHub artifact-metadata storage-record endpoint is a non-critical
+    # side-effect surface that has returned transient 4xx/5xx responses in
+    # every release to date. PyPI (plus the sigstore attestations emitted by
+    # the publish action) is the canonical provenance surface, so this step
+    # must not fail the Publish workflow when the side-effect API misbehaves.
+    assert upload_step.get("continue-on-error") is True
     run = upload_step["run"]
     assert "artifact_url" in run
     assert "github_repository" in run
